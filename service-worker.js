@@ -1,25 +1,37 @@
-const CACHE_NAME = 'dafter-cashiers-v1';
-const SHELL_FILES = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png'];
+// Service worker: يجلب النسخة الجديدة من الموقع أولاً، ولا يعتمد على الكاش إلا عند انقطاع الإنترنت.
+const CACHE = 'cashier-ledger-v2';
 
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_FILES)).catch(()=>{})
-  );
+self.addEventListener('install', function (event) {
   self.skipWaiting();
 });
 
-self.addEventListener('activate', (event) => {
+self.addEventListener('activate', function (event) {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
+    caches.keys()
+      .then(function (keys) {
+        return Promise.all(keys.filter(function (k) { return k !== CACHE; }).map(function (k) { return caches.delete(k); }));
+      })
+      .then(function () { return self.clients.claim(); })
   );
-  self.clients.claim();
 });
 
-self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
+self.addEventListener('fetch', function (event) {
+  const req = event.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return; // Supabase والخطوط وغيرها تُجلب مباشرة
+
   event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request))
+    fetch(req, { cache: 'no-cache' })
+      .then(function (res) {
+        if (res && res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then(function (c) { c.put(req, copy); });
+        }
+        return res;
+      })
+      .catch(function () {
+        return caches.match(req).then(function (r) { return r || caches.match('index.html'); });
+      })
   );
 });
