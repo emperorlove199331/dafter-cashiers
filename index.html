@@ -573,7 +573,7 @@
     </div>
     <div class="field">
       <label>الكاشير</label>
-      <select id="txnCashier"></select>
+      <select id="txnCashier" onchange="refreshSmartPayout()"></select>
     </div>
     <div class="field">
       <label>التاريخ</label>
@@ -588,11 +588,20 @@
     </div>
     <div class="field" id="usdRateField" style="display:none;">
       <label>سعر صرف الدولار (كم ل.س مقابل الدولار)</label>
-      <input type="number" id="txnUsdRate" class="mono" placeholder="مثلاً: 15000">
+      <input type="number" id="txnUsdRate" class="mono" placeholder="مثلاً: 15000" oninput="refreshSmartPayout()">
     </div>
     <div class="field">
       <label id="txnAmountLabel">المبلغ (ل.س)</label>
-      <input type="number" id="txnAmount" class="mono" placeholder="0">
+      <input type="number" id="txnAmount" class="mono" placeholder="0" oninput="refreshSmartPayout()">
+    </div>
+    <div class="field" id="smartPayoutBox" style="display:none; background:var(--brass-soft); border-radius:var(--radius); padding:12px;">
+      <p id="smartDebtInfo" style="margin:0 0 8px; font-size:14px; font-weight:600; color:var(--rust);"></p>
+      <label>تسديد الدين من الربح؟</label>
+      <div class="seg">
+        <button type="button" id="smartYes" class="sel" onclick="setSmartSettle(true)">نعم، سدّد الدين</button>
+        <button type="button" id="smartNo" onclick="setSmartSettle(false)">لا</button>
+      </div>
+      <p id="smartSummary" style="font-size:13px; color:var(--ink); margin:8px 0 0; line-height:1.9;"></p>
     </div>
     <div class="field" id="methodField">
       <label id="methodFieldLabel">طريقة القبض</label>
@@ -1280,7 +1289,7 @@ function txnRowHTML(t, withCashierName){
       badges += `<span class="badge pending">متبقي ${fmt(remainingOf(t))}</span>`;
     }
   } else {
-    badges += `<span class="badge method">تمرير ربح · ${labelMethod(t.method)}</span>`;
+    badges += payoutBadges(t);
   }
   if(t.originalCurrency==='USD'){
     badges += `<span class="badge method">$${fmt(t.originalAmount)} @ ${fmt(t.rateUsed)}</span>`;
@@ -1344,7 +1353,7 @@ function reportRowHTML(t, num){
       badges += `<span class="badge pending">متبقي ${fmt(remainingOf(t))}</span>`;
     }
   } else {
-    badges += `<span class="badge method">تمرير ربح · ${labelMethod(t.method)}</span>`;
+    badges += payoutBadges(t);
   }
   return `
     <div class="row" onclick="openTxnDetail('${t.id}')" style="cursor:pointer;">
@@ -1780,10 +1789,10 @@ function getWalletTotals(){
   // سداد دين معلّق بطريقة "المنصة": هاي حركة عكسية لعملية الشحن (رجوع مبلغ من حساب اللاعب على المنصة إلى رصيد المنصة عندك)
   // فلازم تُضاف لرصيد المنصة (مش تُخصم) — الشحن الأصلي هو يلي خصم، وهاي بترجع جزء أو كل المبلغ يلي خصم
   const paidPlatform = collectedByMethod('platform');
-  const payoutCash = data.transactions.filter(t=>t.type==='payout'&&t.method==='cash').reduce((s,t)=>s+t.amount,0);
-  const payoutSham = data.transactions.filter(t=>t.type==='payout'&&t.method==='shamcash').reduce((s,t)=>s+t.amount,0);
+  const payoutCash = data.transactions.filter(t=>t.type==='payout'&&t.method==='cash').reduce((s,t)=>s+t.amount-(t.offset||0),0);
+  const payoutSham = data.transactions.filter(t=>t.type==='payout'&&t.method==='shamcash').reduce((s,t)=>s+t.amount-(t.offset||0),0);
   // تمرير ربح للاعب مباشرة من المنصة — بيتخصم من رصيد المنصة بدل كاش أو شام كاش
-  const payoutPlatform = data.transactions.filter(t=>t.type==='payout'&&t.method==='platform').reduce((s,t)=>s+t.amount,0);
+  const payoutPlatform = data.transactions.filter(t=>t.type==='payout'&&t.method==='platform').reduce((s,t)=>s+t.amount-(t.offset||0),0);
   // شحنات كاشيرات تم تمويلها من محفظة شام كاش الخاصة بك مباشرة (بدل المنصة) — لازم تنخصم فورًا لأنك أرسلتها فعليًا، بغض النظر عن حالة الدفعة (مسدد/معلّق)
   const chargeFundedSham = data.transactions.filter(t=>t.type==='charge'&&t.fundingSource==='shamcash').reduce((s,t)=>s+t.amount,0);
   // شحنات كاشيرات تم تمويلها مباشرة من رصيد المنصة — نفس المنطق، بترسل من رصيد المنصة وبتقبض كاش أو شام كاش من الكاشير، فلازم تنخصم فورًا من رصيد المنصة
@@ -2064,6 +2073,7 @@ function setPlatformPayinDestination(d){
 function openPlatformPayinSheet(id){
   editingPlatformPayinId = id || null;
   const p = editingPlatformPayinId ? (data.platformPayins||[]).find(x=>x.id===editingPlatformPayinId) : null;
+  if(p && p.smartId){ editingPlatformPayinId = null; showToast('هذه الدفعة مرتبطة بعملية تمرير ربح — احذف العملية من قائمة العمليات'); return; }
   document.getElementById('platformPayinAmount').value = p ? p.amount : '';
   document.getElementById('platformPayinNote').value = p ? (p.note||'') : '';
   document.getElementById('platformPayinDate').value = p ? p.date : todayISO();
@@ -2368,8 +2378,110 @@ function switchView(name){
 // ---------- Add Transaction sheet ----------
 let txnType = 'charge', txnMethod = 'cash', txnStatus = 'paid', txnFundingSource = 'shamcash';
 
+// ---------- تمرير ربح ذكي: تسديد دين اللاعب من الربح ----------
+let smartSettleOn = true;
+function openDebtsOf(cashierId){
+  return data.transactions.filter(x=> x.type==='charge' && x.cashierId===cashierId && remainingOf(x)>0 && !isMonthLocked((x.date||'').slice(0,7)));
+}
+function enteredAmountSYP(){
+  let a = Number(document.getElementById('txnAmount').value) || 0;
+  if(txnCurrency==='USD'){ a = Math.round(a * (Number(document.getElementById('txnUsdRate').value) || 0)); }
+  return a;
+}
+function smartActive(){
+  return txnType==='payout' && !editingTxnId && smartSettleOn && document.getElementById('smartPayoutBox').style.display!=='none';
+}
+function setSmartSettle(on){ smartSettleOn = on; refreshSmartPayout(); }
+function resetPayoutMethodUI(){
+  document.getElementById('methodPlatform').style.display = '';
+  document.getElementById('methodField').style.display = 'block';
+  document.getElementById('methodFieldLabel').textContent = txnType==='charge' ? 'طريقة القبض' : 'طريقة الدفع للاعب';
+}
+function refreshSmartPayout(){
+  const box = document.getElementById('smartPayoutBox');
+  if(!box) return;
+  const cid = document.getElementById('txnCashier').value;
+  const debts = (txnType==='payout' && !editingTxnId && cid) ? openDebtsOf(cid) : [];
+  const totalDebt = debts.reduce((s,d)=>s+remainingOf(d),0);
+  if(totalDebt<=0){ box.style.display='none'; resetPayoutMethodUI(); return; }
+  box.style.display = 'block';
+  document.getElementById('smartDebtInfo').textContent = 'على ' + cashierName(cid) + ' دين ' + fmt(totalDebt) + ' ل.س';
+  document.getElementById('smartYes').classList.toggle('sel', smartSettleOn);
+  document.getElementById('smartNo').classList.toggle('sel', !smartSettleOn);
+  const sum = document.getElementById('smartSummary');
+  if(!smartSettleOn){ sum.textContent = ''; resetPayoutMethodUI(); return; }
+  document.getElementById('methodPlatform').style.display = 'none';
+  if(txnMethod==='platform') setMethod('cash');
+  document.getElementById('methodFieldLabel').textContent = 'طريقة دفع الباقي للاعب';
+  const win = enteredAmountSYP();
+  if(win<=0){
+    sum.textContent = 'اكتب مبلغ الربح وسأحسب لك الباقي.';
+    document.getElementById('methodField').style.display = 'block';
+    return;
+  }
+  const settle = Math.min(win, totalDebt), pay = win - settle;
+  let html = 'ربح ' + fmt(win) + ' − دين ' + fmt(settle) + ' = <b>يُدفع للاعب ' + fmt(pay) + '</b>';
+  if(settle < totalDebt) html += '<br>يبقى على ' + escapeHTML(cashierName(cid)) + ' دين ' + fmt(totalDebt - settle);
+  html += '<br>رصيد المنصة: +' + fmt(win) + ' ثم −' + fmt(pay) + ' (الصافي +' + fmt(settle) + ')';
+  sum.innerHTML = html;
+  document.getElementById('methodField').style.display = pay>0 ? 'block' : 'none';
+}
+// ينفّذ التمرير الذكي: يسدّد الديون (الأقدم أولاً) من الربح، ويدخل الربح لرصيد المنصة، والمدفوع للاعب يُخصم من المنصة
+function applySmartPayout(t){
+  const sid = uid();
+  const debts = openDebtsOf(t.cashierId).sort((a,b)=> sortKey(a).localeCompare(sortKey(b)));
+  let avail = t.amount, settled = 0;
+  debts.forEach(d=>{
+    if(avail<=0) return;
+    const take = Math.min(avail, remainingOf(d));
+    if(take<=0) return;
+    if(!Array.isArray(d.payments)) d.payments = [];
+    d.payments.push({ amount: take, method:'offset', date: t.date, time: t.time, smartId: sid, prevMethod: d.method || null });
+    d.method = 'offset';
+    d.settledDate = t.date;
+    d.settledTime = t.time;
+    const collected = d.payments.reduce((s,p)=>s+p.amount,0);
+    d.status = collected >= d.amount ? 'paid' : 'partial';
+    avail -= take; settled += take;
+  });
+  t.method = 'platform';
+  t.offset = settled;
+  t.paidVia = (t.amount - settled) > 0 ? (txnMethod==='shamcash' ? 'shamcash' : 'cash') : null;
+  t.smartId = sid;
+  if(!data.platformPayins) data.platformPayins = [];
+  data.platformPayins.push({ id: uid(), amount: t.amount, destination:'platform', date: t.date, time: t.time, note: 'ربح ' + cashierName(t.cashierId) + ' (تمرير ربح)', smartId: sid });
+}
+function smartLockedCharges(sid){
+  return data.transactions.some(d=> d.type==='charge' && Array.isArray(d.payments) && d.payments.some(p=>p.smartId===sid) && isMonthLocked((d.date||'').slice(0,7)));
+}
+function reverseSmartPayout(sid){
+  data.platformPayins = (data.platformPayins||[]).filter(p=>p.smartId!==sid);
+  data.transactions.forEach(d=>{
+    if(d.type!=='charge' || !Array.isArray(d.payments)) return;
+    const mine = d.payments.filter(p=>p.smartId===sid);
+    if(!mine.length) return;
+    d.payments = d.payments.filter(p=>p.smartId!==sid);
+    const collected = d.payments.reduce((s,p)=>s+p.amount,0);
+    d.status = collected >= d.amount ? 'paid' : (collected>0 ? 'partial' : 'pending');
+    if(d.method==='offset'){
+      const last = d.payments.length ? d.payments[d.payments.length-1].method : null;
+      d.method = last || mine[0].prevMethod || 'cash';
+    }
+    if(d.payments.length===0){ delete d.payments; delete d.settledDate; delete d.settledTime; }
+  });
+}
+function payoutBadges(t){
+  if(t.smartId){
+    let b = '<span class="badge method">تمرير ربح · ' + (t.paidVia ? labelMethod(t.paidVia) : 'بدون دفع نقدي') + '</span>';
+    if(t.offset>0) b += '<span class="badge paid">سُدِّد دين ' + fmt(t.offset) + '</span>';
+    return b;
+  }
+  return '<span class="badge method">تمرير ربح · ' + labelMethod(t.method) + '</span>';
+}
+
 function openAddTxn(){
   editingTxnId = null;
+  smartSettleOn = true;
   if(data.cashiers.length===0){
     showToast('أضف كاشير الأول');
     switchView('cashiers');
@@ -2398,6 +2510,7 @@ function setCurrency(c){
   if(c==='USD' && !document.getElementById('txnUsdRate').value && data.usdRate){
     document.getElementById('txnUsdRate').value = data.usdRate;
   }
+  refreshSmartPayout();
 }
 function setTxnType(t){
   txnType = t;
@@ -2408,6 +2521,7 @@ function setTxnType(t){
   document.getElementById('statusField').style.display = t==='charge' ? 'block' : 'none';
   document.getElementById('fundingSourceField').style.display = t==='charge' ? 'block' : 'none';
   document.getElementById('txnSheetTitle').textContent = t==='charge' ? 'شحن كاشير' : 'تمرير ربح لاعب';
+  refreshSmartPayout();
 }
 function setMethod(m){
   txnMethod = m;
@@ -2431,7 +2545,7 @@ function setStatus(s){
   document.getElementById('statusPending').classList.toggle('sel', s==='pending');
 }
 // ---------- Before/after change descriptions (for the activity log) ----------
-function labelMethod(m){ return m==='cash' ? 'كاش' : (m==='platform' ? 'المنصة' : 'شام كاش'); }
+function labelMethod(m){ return m==='cash' ? 'كاش' : (m==='platform' ? 'المنصة' : (m==='offset' ? 'من الربح' : 'شام كاش')); }
 function labelStatus(s){ return s==='paid' ? 'مسدد' : (s==='partial' ? 'مسدد جزئياً' : 'معلّق'); }
 function labelFundingSource(f){ return f==='shamcash' ? 'من شام كاش محفظتي' : 'عبر المنصة مباشرة'; }
 function labelTxnType(t){ return t==='charge' ? 'شحن كاشير' : 'تمرير ربح لاعب'; }
@@ -2523,8 +2637,9 @@ function saveTxn(){
     t.fundingSource = txnFundingSource;
     if(txnStatus==='paid') t.payments = [{amount: amount, method: txnMethod, date: date, time: t.time || nowTime()}];
   }
+  if(txnType==='payout' && smartActive()){ applySmartPayout(t); }
   data.transactions.push(t);
-  logActivity(txnType==='charge' ? 'شحن كاشير' : 'تمرير ربح', `${cashierName(cashierId)} — ${fmt(amount)} ل.س`);
+  logActivity(txnType==='charge' ? 'شحن كاشير' : (t.smartId ? 'تمرير ربح مع تسديد دين' : 'تمرير ربح'), `${cashierName(cashierId)} — ${fmt(amount)} ل.س` + (t.smartId ? ` (سُدِّد دين ${fmt(t.offset)})` : ''));
   saveData();
   closeSheet('txnOverlay');
   renderAll();
@@ -2565,6 +2680,8 @@ function deleteCashier(){
     : 'متأكد إنك بدك تحذف هذا الكاشير؟';
   askConfirm('حذف الكاشير', msg, ()=>{
     logActivity('حذف كاشير', c.name + (count>0 ? ` — مع ${count} عملية` : ''));
+    const smartIds = data.transactions.filter(t=>t.cashierId===openCashierId && t.smartId).map(t=>t.smartId);
+    if(smartIds.length) data.platformPayins = (data.platformPayins||[]).filter(p=>!smartIds.includes(p.smartId));
     data.cashiers = data.cashiers.filter(x=>x.id!==openCashierId);
     data.transactions = data.transactions.filter(t=>t.cashierId!==openCashierId);
     saveData();
@@ -2646,7 +2763,13 @@ function openTxnDetail(id){
     }
     if(t.settledDate) rows.push(['تاريخ وساعة آخر تسديد', t.settledDate + (t.settledTime ? ' · ' + t.settledTime : '')]);
   } else {
-    rows.push(['طريقة الدفع للاعب', labelMethod(t.method)]);
+    if(t.smartId){
+      rows.push(['سُدِّد من الدين', fmt(t.offset||0) + ' ل.س']);
+      rows.push(['المدفوع للاعب', fmt(t.amount-(t.offset||0)) + ' ل.س']);
+      rows.push(['طريقة الدفع للاعب', t.paidVia ? labelMethod(t.paidVia) : '—']);
+    } else {
+      rows.push(['طريقة الدفع للاعب', labelMethod(t.method)]);
+    }
   }
   if(t.note) rows.push(['ملاحظة', t.note]);
 
@@ -2684,6 +2807,10 @@ async function shareReceipt(){
       lines.push(`المتبقي: ${fmt(remainingOf(t))} ل.س`);
     }
   }
+  if(!isCharge && t.smartId){
+    lines.push(`سُدِّد من الدين: ${fmt(t.offset||0)} ل.س`);
+    lines.push(`المدفوع للاعب: ${fmt(t.amount-(t.offset||0))} ل.س${t.paidVia ? ' (' + labelMethod(t.paidVia) + ')' : ''}`);
+  }
   if(t.note) lines.push(`ملاحظة: ${t.note}`);
   const text = lines.join('\n');
 
@@ -2720,8 +2847,10 @@ function settleFromDetail(){
 function deleteFromDetail(){
   const check = data.transactions.find(x=>x.id===detailTxnId);
   if(check && isMonthLocked((check.date||'').slice(0,7))){ showToast('هذا الشهر مقفول، افتح القفل من صفحة التقرير الأول'); return; }
+  if(check && check.smartId && smartLockedCharges(check.smartId)){ showToast('هذه العملية سدّدت دين شهر مقفول، افتح القفل أولاً'); return; }
   askConfirm('حذف العملية', 'متأكد إنك بدك تحذف هاي العملية؟', ()=>{
     const t = data.transactions.find(x=>x.id===detailTxnId);
+    if(t && t.smartId) reverseSmartPayout(t.smartId);
     if(t) logActivity('حذف عملية', `${cashierName(t.cashierId)} — ${fmt(t.amount)} ل.س`);
     data.transactions = data.transactions.filter(x=>x.id!==detailTxnId);
     saveData();
@@ -2735,6 +2864,7 @@ let editingTxnId = null;
 function editFromDetail(){
   const t = data.transactions.find(x=>x.id===detailTxnId);
   if(!t) return;
+  if(t.smartId){ showToast('هذه العملية مرتبطة بتسديد دين — احذفها وأعد إدخالها'); return; }
   if(isMonthLocked((t.date||'').slice(0,7))){ showToast('هذا الشهر مقفول، افتح القفل من صفحة التقرير الأول'); return; }
   editingTxnId = t.id;
   closeSheet('txnDetailOverlay');
@@ -2994,6 +3124,7 @@ function confirmReset(){
   }
   const count = data.transactions.length;
   data.transactions = [];
+  data.platformPayins = (data.platformPayins||[]).filter(p=>!p.smartId);
   logActivity('تصفير كل العمليات', `تم حذف ${count} عملية نهائياً`);
   saveData();
   closeSheet('resetOverlay');
