@@ -200,6 +200,31 @@
   nav.bottom button .ic{ font-size:17px; }
   nav.bottom button.active{ color:var(--green); font-weight:600; }
 
+  .quick-actions{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:8px;
+    margin-bottom:18px;
+  }
+  .quick-actions button{
+    background:var(--green);
+    color:#fff;
+    border:none;
+    border-radius:var(--radius);
+    padding:12px 4px;
+    font-family:inherit;
+    font-size:12px;
+    font-weight:600;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:5px;
+    cursor:pointer;
+    line-height:1.25;
+  }
+  .quick-actions button:nth-child(2){ background:var(--brass); }
+  .quick-actions button:nth-child(3){ background:var(--rust); }
+  .quick-actions .qa-icon{ font-size:19px; }
   .fab{
     position:fixed;
     left:18px;
@@ -393,6 +418,11 @@
 <main>
 
   <section id="view-home" class="active">
+    <div class="quick-actions">
+      <button onclick="openAddTxn('charge')"><span class="qa-icon">💰</span><span>شحن كاشير</span></button>
+      <button onclick="openAddTxn('payout')"><span class="qa-icon">🎯</span><span>تمرير ربح لاعب</span></button>
+      <button onclick="openSettleAccountSheet()"><span class="qa-icon">✅</span><span>تسديد حساب</span></button>
+    </div>
     <h2 class="section-title">آخر العمليات</h2>
     <div id="recentList"></div>
   </section>
@@ -550,7 +580,7 @@
 
 </main>
 
-<button class="fab" onclick="openAddTxn()">+</button>
+
 
 <nav class="bottom">
   <button class="active" data-view="home" onclick="switchView('home')"><span class="ic">🏠</span>الرئيسية</button>
@@ -564,7 +594,7 @@
 <div class="overlay" id="txnOverlay">
   <div class="sheet">
     <h3 id="txnSheetTitle">عملية جديدة</h3>
-    <div class="field">
+    <div class="field" id="txnTypeField">
       <label>نوع العملية</label>
       <div class="seg">
         <button type="button" id="typeCharge" class="sel" onclick="setTxnType('charge')">شحن كاشير</button>
@@ -674,6 +704,33 @@
     </div>
     <button class="btn-primary" onclick="confirmSettle()">تأكيد التسديد</button>
     <button class="btn-secondary" onclick="closeSheet('settleOverlay')">إلغاء</button>
+  </div>
+</div>
+
+<!-- Bulk account settlement -->
+<div class="overlay" id="settleAccountOverlay">
+  <div class="sheet">
+    <h3>✅ تسديد حساب</h3>
+    <p style="font-size:13px;color:var(--ink-soft);margin-top:-6px;">تدخل مبلغ إجمالي، والتطبيق يوزعه تلقائياً على ديون هذا الكاشير المعلّقة — الأقدم تاريخاً أولاً.</p>
+    <div class="field">
+      <label>الكاشير</label>
+      <select id="settleAccountCashier" onchange="updateSettleAccountPreview()"></select>
+    </div>
+    <div class="field">
+      <label>المبلغ المسدد الآن (ل.س)</label>
+      <input type="number" id="settleAccountAmount" class="mono" placeholder="0" oninput="updateSettleAccountPreview()">
+    </div>
+    <div class="field">
+      <label>طريقة القبض</label>
+      <div class="seg seg-sm">
+        <button type="button" id="settleAccountCash" class="sel" onclick="setSettleAccountMethod('cash')">كاش</button>
+        <button type="button" id="settleAccountShamCash" onclick="setSettleAccountMethod('shamcash')">شام كاش</button>
+        <button type="button" id="settleAccountPlatform" onclick="setSettleAccountMethod('platform')">المنصة</button>
+      </div>
+    </div>
+    <div id="settleAccountPreview" style="font-size:13px;color:var(--ink-soft);background:var(--paper);border-radius:var(--radius);padding:10px;margin-top:4px;"></div>
+    <button class="btn-primary" onclick="confirmSettleAccount()">تأكيد التسديد</button>
+    <button class="btn-secondary" onclick="closeSheet('settleAccountOverlay')">إلغاء</button>
   </div>
 </div>
 
@@ -2479,7 +2536,7 @@ function payoutBadges(t){
   return '<span class="badge method">تمرير ربح · ' + labelMethod(t.method) + '</span>';
 }
 
-function openAddTxn(){
+function openAddTxn(initialType){
   editingTxnId = null;
   smartSettleOn = true;
   if(data.cashiers.length===0){
@@ -2489,7 +2546,8 @@ function openAddTxn(){
   }
   const sel = document.getElementById('txnCashier');
   sel.innerHTML = data.cashiers.filter(c=>c.status!=='suspended').map(c=>`<option value="${c.id}">${escapeHTML(c.name)}</option>`).join('');
-  setTxnType('charge');
+  document.getElementById('txnTypeField').style.display = 'none';
+  setTxnType(initialType==='payout' ? 'payout' : 'charge');
   document.getElementById('txnAmount').value = '';
   document.getElementById('txnNote').value = '';
   document.getElementById('txnDate').value = todayISO();
@@ -2738,6 +2796,81 @@ function confirmSettle(){
   showToast(isFullyPaid ? 'تم تأكيد التسديد الكامل' : 'تم تسجيل الدفعة الجزئية');
 }
 
+// ---------- Bulk account settlement ----------
+let settleAccountMethod = 'cash';
+function openSettleAccountSheet(){
+  if(data.cashiers.length===0){ showToast('أضف كاشير الأول'); switchView('cashiers'); return; }
+  const sel = document.getElementById('settleAccountCashier');
+  sel.innerHTML = data.cashiers.filter(c=>c.status!=='suspended').map(c=>`<option value="${c.id}">${escapeHTML(c.name)}</option>`).join('');
+  document.getElementById('settleAccountAmount').value = '';
+  setSettleAccountMethod('cash');
+  updateSettleAccountPreview();
+  document.getElementById('settleAccountOverlay').classList.add('show');
+}
+function setSettleAccountMethod(m){
+  settleAccountMethod = m;
+  document.getElementById('settleAccountCash').classList.toggle('sel', m==='cash');
+  document.getElementById('settleAccountShamCash').classList.toggle('sel', m==='shamcash');
+  document.getElementById('settleAccountPlatform').classList.toggle('sel', m==='platform');
+}
+// نفس ديون الكاشير المعلّقة المستخدمة بميزة "تمرير ربح ذكي" (openDebtsOf) — غير مقفولة، مرتّبة الأقدم أولاً
+function sortedDebtsOf(cashierId){
+  return openDebtsOf(cashierId).sort((a,b)=> sortKey(a).localeCompare(sortKey(b)));
+}
+function updateSettleAccountPreview(){
+  const cashierId = document.getElementById('settleAccountCashier').value;
+  const amount = Number(document.getElementById('settleAccountAmount').value) || 0;
+  const box = document.getElementById('settleAccountPreview');
+  if(!cashierId || amount<=0){ box.innerHTML = 'أدخل مبلغاً لمعاينة كيف رح يتوزع.'; return; }
+  const debts = sortedDebtsOf(cashierId);
+  if(debts.length===0){ box.innerHTML = 'ما في ديون معلّقة (غير مقفولة) على هذا الكاشير حالياً.'; return; }
+  let left = amount, lines = [];
+  for(const t of debts){
+    if(left<=0) break;
+    const remaining = remainingOf(t);
+    const applied = Math.min(left, remaining);
+    left -= applied;
+    lines.push(`${t.date} — ${fmt(applied)} من ${fmt(remaining)}${applied>=remaining ? ' (تصير مسددة بالكامل)' : ' (تضل معلّقة جزئياً)'}`);
+  }
+  let html = lines.map(l=>`<div>${l}</div>`).join('');
+  if(left>0) html += `<div style="color:var(--rust); margin-top:6px;">فاضل ${fmt(left)} ل.س ما إلها ديون معلّقة تتخصم منها — ما رح تُطبّق تلقائياً، عدّل المبلغ.</div>`;
+  box.innerHTML = html || 'ما في شي يتطبق.';
+}
+function confirmSettleAccount(){
+  const cashierId = document.getElementById('settleAccountCashier').value;
+  const amount = Number(document.getElementById('settleAccountAmount').value);
+  if(!amount || amount<=0){ showToast('أدخل مبلغ صحيح'); return; }
+  const debts = sortedDebtsOf(cashierId);
+  if(debts.length===0){ showToast('ما في ديون معلّقة لهذا الكاشير'); return; }
+  let left = amount, fullyPaidCount = 0, touchedPartial = false, totalApplied = 0;
+  for(const t of debts){
+    if(left<=0) break;
+    const remaining = remainingOf(t);
+    const applied = Math.min(left, remaining);
+    if(applied<=0) continue;
+    if(!Array.isArray(t.payments)) t.payments = [];
+    t.payments.push({ amount: applied, method: settleAccountMethod, date: todayISO(), time: nowTime() });
+    t.method = settleAccountMethod;
+    t.settledDate = todayISO();
+    t.settledTime = nowTime();
+    const collected = t.payments.reduce((s,p)=>s+p.amount,0);
+    const isFullyPaid = collected >= t.amount;
+    t.status = isFullyPaid ? 'paid' : 'partial';
+    if(isFullyPaid) fullyPaidCount++; else touchedPartial = true;
+    totalApplied += applied;
+    left -= applied;
+  }
+  if(totalApplied<=0){ showToast('ما في شي تم تطبيقه'); return; }
+  logActivity(
+    'تسديد حساب جماعي',
+    `${cashierName(cashierId)} — ${fmt(totalApplied)} ل.س على ${fullyPaidCount + (touchedPartial?1:0)} عملية${left>0 ? ' — فاضل ' + fmt(left) + ' ل.س بدون ديون معلّقة' : ''}`
+  );
+  saveData();
+  closeSheet('settleAccountOverlay');
+  renderAll();
+  showToast(left>0 ? `تم تسديد ${fmt(totalApplied)} ل.س، وفاضل ${fmt(left)} ل.س بدون ديون معلّقة` : `تم تسديد ${fmt(totalApplied)} ل.س بنجاح`);
+}
+
 // ---------- Transaction detail sheet ----------
 let detailTxnId = null;
 function openTxnDetail(id){
@@ -2873,6 +3006,7 @@ function editFromDetail(){
   sel.innerHTML = data.cashiers.map(c=>`<option value="${c.id}">${escapeHTML(c.name)}</option>`).join('');
   sel.value = t.cashierId;
 
+  document.getElementById('txnTypeField').style.display = 'block';
   setTxnType(t.type);
   document.getElementById('txnDate').value = t.date || todayISO();
   document.getElementById('txnNote').value = t.note || '';
