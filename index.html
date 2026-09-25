@@ -478,6 +478,7 @@
     </div>
     <h2 class="section-title">قفل التطبيق</h2>
     <div class="settings-item" id="pinSettingsBox"></div>
+    <div class="settings-item" id="biometricSettingsBox"></div>
     <h2 class="section-title">الحساب السحابي</h2>
     <div class="settings-item">
       <p>مسجّل دخول بحساب: <strong id="accountEmailDisplay">—</strong></p>
@@ -496,7 +497,7 @@
     <h2 class="section-title" style="color:var(--rust); border-color:var(--rust-soft);">منطقة الخطر</h2>
     <div class="settings-item" style="border-color:var(--rust-soft);">
       <p style="color:var(--rust);">حذف كل العمليات (الشحن والأرباح الممرّرة) نهائياً — أسماء الكاشيرات بتبقى محفوظة.</p>
-      <button class="btn-secondary" style="color:var(--rust); border-color:var(--rust);" onclick="openResetPrompt()">تصفير كل العمليات</button>
+      <button class="btn-secondary" style="color:var(--rust); border-color:var(--rust);" onclick="openResetPromptGate()">تصفير كل العمليات</button>
     </div>
   </section>
 
@@ -962,6 +963,7 @@
       <input type="password" id="pinLockInput" inputmode="numeric" class="mono" style="text-align:center; font-size:26px; letter-spacing:10px;" placeholder="••••" onkeydown="if(event.key==='Enter') attemptUnlock();">
     </div>
     <button class="btn-primary" onclick="attemptUnlock()">دخول</button>
+    <button class="btn-secondary" style="margin-top:8px;" onclick="retryBiometricUnlock()">🔓 استخدام البصمة</button>
   </div>
 </div>
 
@@ -1155,7 +1157,10 @@ function toggleNewPasswordVisibility(){
   if(pwInput.type === 'password'){ pwInput.type = 'text'; btn.textContent = 'إخفاء'; }
   else { pwInput.type = 'password'; btn.textContent = 'إظهار'; }
 }
-async function changeAccountPassword(){
+function changeAccountPassword(){
+  requireBiometricOrPin(changeAccountPasswordInner);
+}
+async function changeAccountPasswordInner(){
   const newPass = document.getElementById('newAccountPassword').value;
   if(!newPass || newPass.length < 6){
     showToast('كلمة المرور لازم تكون 6 أحرف على الأقل');
@@ -3034,6 +3039,80 @@ async function sha256Hex(text){
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('ichancy-salt::' + text));
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
 }
+
+// ---------- Biometric (WebAuthn) ----------
+function biometricKey(){ return 'ichancy_biometric_cred_' + (currentUser ? currentUser.id : 'anon'); }
+function hasBiometric(){ return !!localStorage.getItem(biometricKey()); }
+async function biometricAvailable(){
+  try{
+    return !!(window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());
+  }catch(e){ return false; }
+}
+function randBytes(len){ const a = new Uint8Array(len); crypto.getRandomValues(a); return a; }
+function bytesToB64(bytes){ return btoa(String.fromCharCode(...new Uint8Array(bytes))); }
+function b64ToBytes(str){ return Uint8Array.from(atob(str), c=>c.charCodeAt(0)); }
+
+async function enrollBiometric(){
+  if(!currentUser){ showToast('سجل دخول الأول'); return; }
+  if(!(await biometricAvailable())){ showToast('جهازك أو متصفحك ما بيدعم البصمة/الوجه هلق'); return; }
+  try{
+    const cred = await navigator.credentials.create({
+      publicKey: {
+        challenge: randBytes(32),
+        rp: { name: 'دفتر الكاشيرات' },
+        user: { id: randBytes(16), name: currentUser.email || 'user', displayName: currentUser.email || 'user' },
+        pubKeyCredParams: [{ type:'public-key', alg:-7 }, { type:'public-key', alg:-257 }],
+        authenticatorSelection: { authenticatorAttachment:'platform', userVerification:'required' },
+        timeout: 60000
+      }
+    });
+    if(!cred) throw new Error('no credential');
+    localStorage.setItem(biometricKey(), bytesToB64(cred.rawId));
+    renderPinSettings();
+    showToast('تم تفعيل البصمة بنجاح');
+  }catch(e){
+    showToast('ما قدرنا نفعّل البصمة، جرب مرة ثانية');
+  }
+}
+function removeBiometric(){
+  askConfirm('إلغاء البصمة', 'متأكد إنك بدك تلغي حماية البصمة؟', ()=>{
+    localStorage.removeItem(biometricKey());
+    renderPinSettings();
+    showToast('تم إلغاء البصمة');
+  });
+}
+async function verifyBiometric(){
+  if(!hasBiometric()) return false;
+  try{
+    const credId = b64ToBytes(localStorage.getItem(biometricKey()));
+    const assertion = await navigator.credentials.get({
+      publicKey: {
+        challenge: randBytes(32),
+        allowCredentials: [{ id: credId, type:'public-key' }],
+        userVerification: 'required',
+        timeout: 30000
+      }
+    });
+    return !!assertion;
+  }catch(e){
+    return false;
+  }
+}
+// Generic gate for sensitive actions: try biometric first, fall back to the app PIN, else just proceed.
+let pinUnlockCallback = null;
+async function requireBiometricOrPin(callback){
+  if(hasBiometric() && await biometricAvailable()){
+    const ok = await verifyBiometric();
+    if(ok){ callback(); return; }
+    showToast('تعذّر التحقق بالبصمة، أدخل رمز القفل للتأكيد');
+  }
+  if(!localStorage.getItem(PIN_STORAGE_KEY)){ callback(); return; }
+  pinUnlockCallback = callback;
+  document.getElementById('pinLockInput').value = '';
+  document.getElementById('pinLockOverlay').classList.add('show');
+  setTimeout(()=>{ const inp = document.getElementById('pinLockInput'); if(inp) inp.focus(); }, 150);
+}
+
 function renderPinSettings(){
   const el = document.getElementById('pinSettingsBox');
   if(!el) return;
@@ -3046,6 +3125,15 @@ function renderPinSettings(){
        </div>`
     : `<p>احمِ التطبيق برمز دخول قصير، بحيث ما حدا يفتحه إلا إنت.</p>
        <button class="btn-primary" onclick="openPinSetup()">تفعيل قفل برمز</button>`;
+  const bioEl = document.getElementById('biometricSettingsBox');
+  if(bioEl){
+    const enrolled = hasBiometric();
+    bioEl.innerHTML = enrolled
+      ? `<p>🔒 البصمة/الوجه مفعّلة — بتُستخدم لفتح التطبيق وللتأكيد على العمليات الحساسة (تصفير البيانات، تغيير كلمة السر).</p>
+         <button class="btn-secondary" style="color:var(--rust); border-color:var(--rust-soft);" onclick="removeBiometric()">إلغاء البصمة</button>`
+      : `<p>فعّل البصمة أو بصمة الوجه كطبقة حماية إضافية (مع رمز القفل، مو بدله). إذا فشلت البصمة، بيرجع يطلب رمز القفل تلقائياً.</p>
+         <button class="btn-primary" onclick="enrollBiometric()">تفعيل البصمة</button>`;
+  }
 }
 function openPinSetup(){
   document.getElementById('pinSetupNew').value = '';
@@ -3079,20 +3167,37 @@ async function attemptUnlock(){
   if(hash === storedHash){
     document.getElementById('pinLockOverlay').classList.remove('show');
     document.getElementById('pinLockInput').value = '';
+    const cb = pinUnlockCallback; pinUnlockCallback = null;
+    if(cb) cb();
   } else {
     showToast('رمز غير صحيح');
     document.getElementById('pinLockInput').value = '';
   }
 }
-function checkPinLockOnBoot(){
-  const storedHash = localStorage.getItem(PIN_STORAGE_KEY);
-  if(storedHash){
-    document.getElementById('pinLockOverlay').classList.add('show');
-    setTimeout(()=>{
-      const inp = document.getElementById('pinLockInput');
-      if(inp) inp.focus();
-    }, 150);
+async function retryBiometricUnlock(){
+  if(!hasBiometric()){ showToast('البصمة مش مفعّلة، استخدم رمز القفل'); return; }
+  const ok = await verifyBiometric();
+  if(ok){
+    document.getElementById('pinLockOverlay').classList.remove('show');
+    document.getElementById('pinLockInput').value = '';
+    const cb = pinUnlockCallback; pinUnlockCallback = null;
+    if(cb) cb();
+  } else {
+    showToast('تعذّر التحقق بالبصمة');
   }
+}
+async function checkPinLockOnBoot(){
+  const storedHash = localStorage.getItem(PIN_STORAGE_KEY);
+  if(!storedHash) return;
+  if(hasBiometric() && await biometricAvailable()){
+    const ok = await verifyBiometric();
+    if(ok){ return; }
+  }
+  document.getElementById('pinLockOverlay').classList.add('show');
+  setTimeout(()=>{
+    const inp = document.getElementById('pinLockInput');
+    if(inp) inp.focus();
+  }, 150);
 }
 
 // ---------- Encryption helpers (Web Crypto AES-GCM) ----------
@@ -3227,6 +3332,9 @@ function applyImportedData(imported, sourceName){
 
 // ---------- Reset all data ----------
 const RESET_PASSWORD = 'Butcher.1';
+function openResetPromptGate(){
+  requireBiometricOrPin(openResetPrompt);
+}
 function openResetPrompt(){
   const pwInput = document.getElementById('resetPassword');
   pwInput.value = '';
