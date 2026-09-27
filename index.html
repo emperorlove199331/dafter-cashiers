@@ -606,6 +606,13 @@
       <label>الكاشير</label>
       <select id="txnCashier" onchange="refreshSmartPayout()"></select>
     </div>
+    <div class="field" id="profitForField" style="display:none;">
+      <label>نوع الربح</label>
+      <div class="seg">
+        <button type="button" id="profitForPlayer" class="sel" onclick="setProfitFor('player')">ربح لاعب</button>
+        <button type="button" id="profitForCashier" onclick="setProfitFor('cashier')">ربح الكاشير نفسه</button>
+      </div>
+    </div>
     <div class="field">
       <label>التاريخ</label>
       <input type="date" id="txnDate">
@@ -1906,15 +1913,15 @@ function renderWalletBalance(){
   const el = document.getElementById('walletBalanceBox');
   if(!el) return;
   const { cashBalance, shamBalance, platformBalance } = getWalletTotals();
-  const totalCommission = PROFILE.commissions ? getTotalCommission() : 0;
   const totalTransferFee = getTotalTransferFee();
   // "قبل العمولة" = إجمالي خام ثابت، ما بينخصم منه أي عمولة تحويل تلقائيًا مع كل تحويل تسويه.
   // أرصدة المحافظ الفعلية (cashBalance/shamBalance/platformBalance) هي المبلغ الحقيقي الموجود فعليًا بكل محفظة،
   // وهاد أصلاً متأثر بخصم عمولة التحويلات (لأنه هيك المصاري الحقيقية تنخصم). فلحساب "الخام" بنرجع نضيف عمولة
   // التحويلات مرة وحدة على مجموع الأرصدة الفعلية، حتى يضل الرقم الخام ثابت ومش منخفض تلقائيًا مع كل تحويل.
   const totalBeforeCommission = cashBalance + shamBalance + platformBalance + totalTransferFee;
-  // "بعد خصم العمولة" = الرقم الخام، مطروح منه كل العمولات (عمولة التحويلات + عمولة الكاشيرات) دفعة وحدة وبوضوح.
-  const totalAfterCommission = totalBeforeCommission - totalTransferFee - totalCommission;
+  // رأس المال = كل الديون المعلّقة (على كل الكاشيرات، كل الوقت) + أرصدة المحافظ الفعلية الثلاثة.
+  const totalPendingAll = data.transactions.filter(t=>t.type==='charge').reduce((s,t)=>s+remainingOf(t),0);
+  const totalCapital = totalPendingAll + platformBalance + cashBalance + shamBalance;
   el.innerHTML = `
     <div class="stat-row" style="margin-bottom:10px;">
       <div class="stat" style="background:var(--green-soft);">
@@ -1943,17 +1950,13 @@ function renderWalletBalance(){
         <p class="k" style="color:var(--rust);">📉 عمولة التحويلات (تراكمية)</p>
         <p class="v mono" style="color:var(--rust);">${fmt(totalTransferFee)}</p>
       </div>
-      ${PROFILE.commissions ? `<div class="stat" style="background:var(--rust-soft);">
-        <p class="k" style="color:var(--rust);">📉 عمولة الكاشيرات (تراكمية)</p>
-        <p class="v mono" style="color:var(--rust);">${fmt(totalCommission)}</p>
-      </div>` : ''}
     </div>
-    ${PROFILE.commissions ? `<div class="stat-row">
+    <div class="stat-row">
       <div class="stat" style="background:var(--green-soft);">
-        <p class="k" style="color:var(--green);">✅ مجموع كل المحافظ (بعد خصم العمولة)</p>
-        <p class="v mono" style="color:var(--green);">${fmt(totalAfterCommission)}</p>
+        <p class="k" style="color:var(--green);">🏛️ مجموع رأس المال</p>
+        <p class="v mono" style="color:var(--green);">${fmt(totalCapital)}</p>
       </div>
-    </div>` : ''}`;
+    </div>`;
 }
 let transferFrom = 'cash';
 let transferTo = 'shamcash';
@@ -2438,7 +2441,7 @@ function switchView(name){
 }
 
 // ---------- Add Transaction sheet ----------
-let txnType = 'charge', txnMethod = 'cash', txnStatus = 'paid', txnFundingSource = 'shamcash';
+let txnType = 'charge', txnMethod = 'cash', txnStatus = 'paid', txnFundingSource = 'shamcash', profitFor = 'player';
 
 // ---------- تمرير ربح ذكي: تسديد دين اللاعب من الربح ----------
 let smartSettleOn = true;
@@ -2511,7 +2514,7 @@ function applySmartPayout(t){
   t.paidVia = (t.amount - settled) > 0 ? (txnMethod==='shamcash' ? 'shamcash' : 'cash') : null;
   t.smartId = sid;
   if(!data.platformPayins) data.platformPayins = [];
-  data.platformPayins.push({ id: uid(), amount: t.amount, destination:'platform', date: t.date, time: t.time, note: 'ربح ' + cashierName(t.cashierId) + ' (تمرير ربح)', smartId: sid });
+  data.platformPayins.push({ id: uid(), amount: t.amount, destination:'platform', date: t.date, time: t.time, note: (t.profitFor==='cashier' ? 'ربح الكاشير نفسه ' : 'ربح لاعب عبر ') + cashierName(t.cashierId) + ' (تمرير ربح)', smartId: sid });
 }
 function smartLockedCharges(sid){
   return data.transactions.some(d=> d.type==='charge' && Array.isArray(d.payments) && d.payments.some(p=>p.smartId===sid) && isMonthLocked((d.date||'').slice(0,7)));
@@ -2533,12 +2536,13 @@ function reverseSmartPayout(sid){
   });
 }
 function payoutBadges(t){
+  const label = t.profitFor==='cashier' ? 'تمرير ربح الكاشير' : 'تمرير ربح لاعب';
   if(t.smartId){
-    let b = '<span class="badge method">تمرير ربح · ' + (t.paidVia ? labelMethod(t.paidVia) : 'بدون دفع نقدي') + '</span>';
+    let b = '<span class="badge method">' + label + ' · ' + (t.paidVia ? labelMethod(t.paidVia) : 'بدون دفع نقدي') + '</span>';
     if(t.offset>0) b += '<span class="badge paid">سُدِّد دين ' + fmt(t.offset) + '</span>';
     return b;
   }
-  return '<span class="badge method">تمرير ربح · ' + labelMethod(t.method) + '</span>';
+  return '<span class="badge method">' + label + ' · ' + labelMethod(t.method) + '</span>';
 }
 
 function openAddTxn(initialType){
@@ -2553,6 +2557,7 @@ function openAddTxn(initialType){
   sel.innerHTML = data.cashiers.filter(c=>c.status!=='suspended').map(c=>`<option value="${c.id}">${escapeHTML(c.name)}</option>`).join('');
   document.getElementById('txnTypeField').style.display = 'none';
   setTxnType(initialType==='payout' ? 'payout' : 'charge');
+  setProfitFor('player');
   document.getElementById('txnAmount').value = '';
   document.getElementById('txnNote').value = '';
   document.getElementById('txnDate').value = todayISO();
@@ -2583,7 +2588,15 @@ function setTxnType(t){
   document.getElementById('methodFieldLabel').textContent = t==='charge' ? 'طريقة القبض' : 'طريقة الدفع للاعب';
   document.getElementById('statusField').style.display = t==='charge' ? 'block' : 'none';
   document.getElementById('fundingSourceField').style.display = t==='charge' ? 'block' : 'none';
-  document.getElementById('txnSheetTitle').textContent = t==='charge' ? 'شحن كاشير' : 'تمرير ربح لاعب';
+  document.getElementById('profitForField').style.display = t==='payout' ? 'block' : 'none';
+  document.getElementById('txnSheetTitle').textContent = t==='charge' ? 'شحن كاشير' : (profitFor==='player' ? 'تمرير ربح لاعب' : 'تمرير ربح الكاشير');
+  refreshSmartPayout();
+}
+function setProfitFor(f){
+  profitFor = f;
+  document.getElementById('profitForPlayer').classList.toggle('sel', f==='player');
+  document.getElementById('profitForCashier').classList.toggle('sel', f==='cashier');
+  if(txnType==='payout') document.getElementById('txnSheetTitle').textContent = f==='player' ? 'تمرير ربح لاعب' : 'تمرير ربح الكاشير';
   refreshSmartPayout();
 }
 function setMethod(m){
@@ -2672,6 +2685,7 @@ function saveTxn(){
         delete t.payments;
         delete t.settledDate;
         delete t.settledTime;
+        t.profitFor = profitFor;
       }
       const changes = diffTxnFields(before, t);
       logActivity('تعديل عملية', changes.length ? changes.join(' | ') : `${cashierName(cashierId)} — لا تغييرات فعلية`);
@@ -2700,9 +2714,13 @@ function saveTxn(){
     t.fundingSource = txnFundingSource;
     if(txnStatus==='paid') t.payments = [{amount: amount, method: txnMethod, date: date, time: t.time || nowTime()}];
   }
+  if(txnType==='payout') t.profitFor = profitFor;
   if(txnType==='payout' && smartActive()){ applySmartPayout(t); }
   data.transactions.push(t);
-  logActivity(txnType==='charge' ? 'شحن كاشير' : (t.smartId ? 'تمرير ربح مع تسديد دين' : 'تمرير ربح'), `${cashierName(cashierId)} — ${fmt(amount)} ل.س` + (t.smartId ? ` (سُدِّد دين ${fmt(t.offset)})` : ''));
+  logActivity(
+    txnType==='charge' ? 'شحن كاشير' : (t.smartId ? (profitFor==='player' ? 'تمرير ربح لاعب مع تسديد دين' : 'تمرير ربح الكاشير مع تسديد دين') : (profitFor==='player' ? 'تمرير ربح لاعب' : 'تمرير ربح الكاشير')),
+    `${cashierName(cashierId)} — ${fmt(amount)} ل.س` + (t.smartId ? ` (سُدِّد دين ${fmt(t.offset)})` : '')
+  );
   saveData();
   closeSheet('txnOverlay');
   renderAll();
@@ -3013,6 +3031,7 @@ function editFromDetail(){
 
   document.getElementById('txnTypeField').style.display = 'block';
   setTxnType(t.type);
+  if(t.type==='payout') setProfitFor(t.profitFor || 'player');
   document.getElementById('txnDate').value = t.date || todayISO();
   document.getElementById('txnNote').value = t.note || '';
   if(t.originalCurrency==='USD'){
