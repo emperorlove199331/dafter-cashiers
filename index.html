@@ -607,10 +607,10 @@
       <select id="txnCashier" onchange="refreshSmartPayout()"></select>
     </div>
     <div class="field" id="profitForField" style="display:none;">
-      <label>نوع الربح</label>
+      <label>لمين هالربح؟</label>
       <div class="seg">
-        <button type="button" id="profitForPlayer" class="sel" onclick="setProfitFor('player')">ربح لاعب</button>
-        <button type="button" id="profitForCashier" onclick="setProfitFor('cashier')">ربح الكاشير نفسه</button>
+        <button type="button" id="profitForCashier" class="sel" onclick="setProfitFor('cashier')">ربح كاشير عندي</button>
+        <button type="button" id="profitForPlayer" onclick="setProfitFor('player')">ربح لاعب مش مسجّل</button>
       </div>
     </div>
     <div class="field">
@@ -1107,8 +1107,10 @@ async function onLoggedIn(user){
   await fetchCloudData();
   const emailEl = document.getElementById('accountEmailDisplay');
   if(emailEl) emailEl.textContent = user.email || '—';
+  const hasPinLock = !!localStorage.getItem(PIN_STORAGE_KEY);
+  if(hasPinLock){ document.getElementById('pinLockOverlay').classList.add('show'); }
   renderAll();
-  checkPinLockOnBoot();
+  if(hasPinLock){ await checkPinLockOnBoot(); }
 }
 
 async function fetchCloudData(){
@@ -2441,7 +2443,7 @@ function switchView(name){
 }
 
 // ---------- Add Transaction sheet ----------
-let txnType = 'charge', txnMethod = 'cash', txnStatus = 'paid', txnFundingSource = 'shamcash', profitFor = 'player';
+let txnType = 'charge', txnMethod = 'cash', txnStatus = 'paid', txnFundingSource = 'shamcash', profitFor = 'cashier';
 
 // ---------- تمرير ربح ذكي: تسديد دين اللاعب من الربح ----------
 let smartSettleOn = true;
@@ -2514,7 +2516,7 @@ function applySmartPayout(t){
   t.paidVia = (t.amount - settled) > 0 ? (txnMethod==='shamcash' ? 'shamcash' : 'cash') : null;
   t.smartId = sid;
   if(!data.platformPayins) data.platformPayins = [];
-  data.platformPayins.push({ id: uid(), amount: t.amount, destination:'platform', date: t.date, time: t.time, note: (t.profitFor==='cashier' ? 'ربح الكاشير نفسه ' : 'ربح لاعب عبر ') + cashierName(t.cashierId) + ' (تمرير ربح)', smartId: sid });
+  data.platformPayins.push({ id: uid(), amount: t.amount, destination:'platform', date: t.date, time: t.time, note: 'ربح ' + cashierName(t.cashierId) + ' (تمرير ربح)', smartId: sid });
 }
 function smartLockedCharges(sid){
   return data.transactions.some(d=> d.type==='charge' && Array.isArray(d.payments) && d.payments.some(p=>p.smartId===sid) && isMonthLocked((d.date||'').slice(0,7)));
@@ -2536,13 +2538,12 @@ function reverseSmartPayout(sid){
   });
 }
 function payoutBadges(t){
-  const label = t.profitFor==='cashier' ? 'تمرير ربح الكاشير' : 'تمرير ربح لاعب';
   if(t.smartId){
-    let b = '<span class="badge method">' + label + ' · ' + (t.paidVia ? labelMethod(t.paidVia) : 'بدون دفع نقدي') + '</span>';
+    let b = '<span class="badge method">تمرير ربح · ' + (t.paidVia ? labelMethod(t.paidVia) : 'بدون دفع نقدي') + '</span>';
     if(t.offset>0) b += '<span class="badge paid">سُدِّد دين ' + fmt(t.offset) + '</span>';
     return b;
   }
-  return '<span class="badge method">' + label + ' · ' + labelMethod(t.method) + '</span>';
+  return '<span class="badge method">تمرير ربح · ' + labelMethod(t.method) + '</span>';
 }
 
 function openAddTxn(initialType){
@@ -2557,7 +2558,7 @@ function openAddTxn(initialType){
   sel.innerHTML = data.cashiers.filter(c=>c.status!=='suspended').map(c=>`<option value="${c.id}">${escapeHTML(c.name)}</option>`).join('');
   document.getElementById('txnTypeField').style.display = 'none';
   setTxnType(initialType==='payout' ? 'payout' : 'charge');
-  setProfitFor('player');
+  setProfitFor('cashier');
   document.getElementById('txnAmount').value = '';
   document.getElementById('txnNote').value = '';
   document.getElementById('txnDate').value = todayISO();
@@ -2589,14 +2590,21 @@ function setTxnType(t){
   document.getElementById('statusField').style.display = t==='charge' ? 'block' : 'none';
   document.getElementById('fundingSourceField').style.display = t==='charge' ? 'block' : 'none';
   document.getElementById('profitForField').style.display = t==='payout' ? 'block' : 'none';
-  document.getElementById('txnSheetTitle').textContent = t==='charge' ? 'شحن كاشير' : (profitFor==='player' ? 'تمرير ربح لاعب' : 'تمرير ربح الكاشير');
+  document.getElementById('txnSheetTitle').textContent = t==='charge' ? 'شحن كاشير' : 'تمرير ربح لاعب عبر كاشير';
   refreshSmartPayout();
 }
 function setProfitFor(f){
-  profitFor = f;
-  document.getElementById('profitForPlayer').classList.toggle('sel', f==='player');
-  document.getElementById('profitForCashier').classList.toggle('sel', f==='cashier');
-  if(txnType==='payout') document.getElementById('txnSheetTitle').textContent = f==='player' ? 'تمرير ربح لاعب' : 'تمرير ربح الكاشير';
+  if(f==='player'){
+    closeSheet('txnOverlay');
+    openPlatformPayinSheet();
+    setPlatformPayinDestination('platform');
+    document.getElementById('platformPayinNote').value = 'ربح لاعب — ';
+    return;
+  }
+  profitFor = 'cashier';
+  document.getElementById('profitForPlayer').classList.remove('sel');
+  document.getElementById('profitForCashier').classList.add('sel');
+  if(txnType==='payout') document.getElementById('txnSheetTitle').textContent = 'تمرير ربح لاعب عبر كاشير';
   refreshSmartPayout();
 }
 function setMethod(m){
@@ -2685,7 +2693,6 @@ function saveTxn(){
         delete t.payments;
         delete t.settledDate;
         delete t.settledTime;
-        t.profitFor = profitFor;
       }
       const changes = diffTxnFields(before, t);
       logActivity('تعديل عملية', changes.length ? changes.join(' | ') : `${cashierName(cashierId)} — لا تغييرات فعلية`);
@@ -2714,11 +2721,10 @@ function saveTxn(){
     t.fundingSource = txnFundingSource;
     if(txnStatus==='paid') t.payments = [{amount: amount, method: txnMethod, date: date, time: t.time || nowTime()}];
   }
-  if(txnType==='payout') t.profitFor = profitFor;
   if(txnType==='payout' && smartActive()){ applySmartPayout(t); }
   data.transactions.push(t);
   logActivity(
-    txnType==='charge' ? 'شحن كاشير' : (t.smartId ? (profitFor==='player' ? 'تمرير ربح لاعب مع تسديد دين' : 'تمرير ربح الكاشير مع تسديد دين') : (profitFor==='player' ? 'تمرير ربح لاعب' : 'تمرير ربح الكاشير')),
+    txnType==='charge' ? 'شحن كاشير' : (t.smartId ? 'تمرير ربح مع تسديد دين' : 'تمرير ربح'),
     `${cashierName(cashierId)} — ${fmt(amount)} ل.س` + (t.smartId ? ` (سُدِّد دين ${fmt(t.offset)})` : '')
   );
   saveData();
@@ -3031,7 +3037,7 @@ function editFromDetail(){
 
   document.getElementById('txnTypeField').style.display = 'block';
   setTxnType(t.type);
-  if(t.type==='payout') setProfitFor(t.profitFor || 'player');
+  if(t.type==='payout') setProfitFor('cashier');
   document.getElementById('txnDate').value = t.date || todayISO();
   document.getElementById('txnNote').value = t.note || '';
   if(t.originalCurrency==='USD'){
@@ -3206,13 +3212,11 @@ async function retryBiometricUnlock(){
   }
 }
 async function checkPinLockOnBoot(){
-  const storedHash = localStorage.getItem(PIN_STORAGE_KEY);
-  if(!storedHash) return;
+  // النافذة انفتحت أصلاً (فوق كل شي) من onLoggedIn قبل ما نجرب أي شي — هون بس منحاول نفكها.
   if(hasBiometric() && await biometricAvailable()){
     const ok = await verifyBiometric();
-    if(ok){ return; }
+    if(ok){ document.getElementById('pinLockOverlay').classList.remove('show'); return; }
   }
-  document.getElementById('pinLockOverlay').classList.add('show');
   setTimeout(()=>{
     const inp = document.getElementById('pinLockInput');
     if(inp) inp.focus();
