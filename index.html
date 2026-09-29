@@ -543,6 +543,12 @@
     <h2 class="section-title">أرصدة المحفظة</h2>
     <div id="walletBalanceBox" style="margin-bottom:20px;"></div>
 
+    <div id="fundingPendingSection" style="display:none;margin-bottom:20px;">
+      <h2 class="section-title" style="color:var(--rust);">⏳ شحن المنصة المعلّق (دين للمموّل)</h2>
+      <p style="font-size:13px;color:var(--ink-soft);margin-top:-8px;">منفصل عن ديون الكاشيرات. اضغط على أي دفعة لتسديدها.</p>
+      <div id="fundingPendingList"></div>
+    </div>
+
     <h2 class="section-title">تحويل بين المحافظ</h2>
     <p style="font-size:13px;color:var(--ink-soft);margin-top:-8px;">استخدمها لما تاخد من محفظة وتحط بمحفظة تانية (كاش، شام كاش، أو المنصة) — مش شحن ولا تمرير ربح.</p>
     <div class="btn-row" style="margin-bottom:10px;">
@@ -1986,6 +1992,26 @@ function getTotalCommission(){
     return sum + (net * rate / 100);
   }, 0);
 }
+function renderFundingPending(){
+  const sec = document.getElementById('fundingPendingSection');
+  const list = document.getElementById('fundingPendingList');
+  if(!sec || !list) return;
+  const pending = (data.walletFunding||[]).filter(x=>fundingOwed(x)>0)
+    .sort((a,b)=> (a.date+(a.time||'')).localeCompare(b.date+(b.time||'')));
+  if(pending.length===0){ sec.style.display='none'; list.innerHTML=''; return; }
+  sec.style.display='block';
+  const total = pending.reduce((s,x)=>s+fundingOwed(x),0);
+  list.innerHTML = `<div class="stat-row" style="margin-bottom:10px;"><div class="stat" style="background:var(--rust-soft);">
+      <p class="k" style="color:var(--rust);">إجمالي المستحق عليك</p>
+      <p class="v mono" style="color:var(--rust);">${fmt(total)}</p></div></div>` +
+    pending.map(x=>`<div class="row" style="cursor:pointer;" onclick="openFundingPaySheet('${x.id}')">
+      <div class="main">
+        <p class="name">شحن المنصة — واصل ${fmt(x.amount)}</p>
+        <p class="sub"><span>${fmtDT(x)}</span> · مستحق ${fmt(x.paidAmount)}${fundingPaidTotal(x)>0 ? ' · انسدد '+fmt(fundingPaidTotal(x)) : ''}${x.note ? ' · '+escapeHTML(x.note) : ''}</p>
+      </div>
+      <div class="amount mono pending">${fmt(fundingOwed(x))}</div>
+    </div>`).join('');
+}
 function renderWalletBalance(){
   const el = document.getElementById('walletBalanceBox');
   if(!el) return;
@@ -2030,12 +2056,6 @@ function renderWalletBalance(){
         <p class="v mono" style="color:var(--rust);">${fmt(totalTransferFee)}</p>
       </div>
     </div>
-    ${fundingOwedTotal>0 ? `<div class="stat-row" style="margin-bottom:10px;">
-      <div class="stat" style="background:var(--rust-soft); cursor:pointer;" onclick="openPendingFundingPicker()">
-        <p class="k" style="color:var(--rust);">⏳ دين شحن المنصة المعلّق (اضغط للتسديد)</p>
-        <p class="v mono" style="color:var(--rust);">${fmt(fundingOwedTotal)}</p>
-      </div>
-    </div>` : ''}
     <div class="stat-row">
       <div class="stat" style="background:var(--green-soft);">
         <p class="k" style="color:var(--green);">🏛️ مجموع رأس المال</p>
@@ -2210,7 +2230,7 @@ function openFundingSheet(id){
   document.getElementById('fundingOverlay').classList.add('show');
 }
 function saveFunding(){
-  const amount = Number(document.getElementById('fundingAmount').value);
+  let amount = Number(document.getElementById('fundingAmount').value);
   if(!amount || amount<=0){ showToast('أدخل مبلغ صحيح'); return; }
   const date = document.getElementById('fundingDate').value || todayISO();
   if(date > todayISO()){ showToast('التاريخ ما لازم يكون بالمستقبل'); return; }
@@ -2658,6 +2678,7 @@ function renderWalletHistory(){
 
 function renderAll(){
   renderWalletBalance();
+  renderFundingPending();
   renderWalletHistory();
   renderReconcileHistory();
   renderHeader();
