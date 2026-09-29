@@ -779,6 +779,7 @@
         <div class="seg seg-sm">
           <button type="button" id="fundingSrcCash" class="sel" onclick="setFundingPaySource('cash')">كاش</button>
           <button type="button" id="fundingSrcSham" onclick="setFundingPaySource('shamcash')">شام كاش</button>
+          <button type="button" id="fundingSrcPending" onclick="setFundingPaySource('pending')">معلّق</button>
           <button type="button" id="fundingSrcExt" onclick="setFundingPaySource('external')">مموّل خارجي</button>
         </div>
       </div>
@@ -786,6 +787,11 @@
         <label>المبلغ يلي وصل المنصة فعليًا</label>
         <input type="number" id="fundingReceived" class="mono" placeholder="0" oninput="updateFundingFeePreview()">
         <p style="font-size:12.5px;color:var(--ink-soft);margin-top:6px;" id="fundingFeePreview"></p>
+      </div>
+      <p id="fundingPendingHint" style="display:none;font-size:12.5px;color:var(--rust);margin:-4px 0 12px;">المنصة بتنشحن هلأ بالمبلغ الواصل، والمبلغ المدفوع بيضل دين عليك لحد ما تسدده (كاش أو شام كاش) من زر التسديد.</p>
+      <div id="fundingDebtBox" style="display:none;margin-bottom:12px;">
+        <p id="fundingDebtInfo" style="font-size:13px;margin-bottom:8px;"></p>
+        <button type="button" class="btn-primary" onclick="openFundingPaySheet(editingFundingId)">💵 تسديد دفعة</button>
       </div>
     </div>
     <div class="field">
@@ -799,6 +805,31 @@
     <button class="btn-primary" onclick="saveFunding()">حفظ التمويل</button>
     <button class="btn-secondary" id="fundingDeleteBtn" style="display:none;color:var(--rust); border-color:var(--rust-soft);" onclick="deleteFunding()">حذف دفعة التمويل</button>
     <button class="btn-secondary" onclick="closeSheet('fundingOverlay')">إلغاء</button>
+  </div>
+</div>
+
+<div class="overlay" id="fundingPayOverlay">
+  <div class="sheet">
+    <h3>تسديد شحن المنصة</h3>
+    <p id="fundingPayInfo" style="font-size:13px;color:var(--ink-soft);margin-bottom:12px;"></p>
+    <div class="field">
+      <label>ادفع من</label>
+      <div class="seg seg-sm">
+        <button type="button" id="fundingPayCash" class="sel" onclick="setFundingPayMethod('cash')">الكاش</button>
+        <button type="button" id="fundingPaySham" onclick="setFundingPayMethod('shamcash')">شام كاش</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>المبلغ (ل.س)</label>
+      <input type="number" id="fundingPayAmount" class="mono" placeholder="0">
+    </div>
+    <div class="field">
+      <label>التاريخ</label>
+      <input type="date" id="fundingPayDate">
+    </div>
+    <div id="fundingPayHistory" style="margin-bottom:10px;"></div>
+    <button class="btn-primary" onclick="saveFundingPay()">تسجيل التسديد</button>
+    <button class="btn-secondary" onclick="closeSheet('fundingPayOverlay')">إغلاق</button>
   </div>
 </div>
 
@@ -1896,8 +1927,8 @@ function getWalletTotals(){
   const fundingSham = funding.filter(x=>x.destination==='shamcash').reduce((s,x)=>s+x.amount,0);
   const fundingPlatform = funding.filter(x=>x.destination==='platform').reduce((s,x)=>s+x.amount,0);
   // شحن المنصة من كاش/شام كاش: المبلغ المدفوع (كامل، قبل العمولة) بينخصم من المحفظة المصدر
-  const fundPaidCash = funding.filter(x=>x.destination==='platform'&&x.paySource==='cash').reduce((s,x)=>s+(x.paidAmount!==undefined?x.paidAmount:x.amount),0);
-  const fundPaidSham = funding.filter(x=>x.destination==='platform'&&x.paySource==='shamcash').reduce((s,x)=>s+(x.paidAmount!==undefined?x.paidAmount:x.amount),0);
+  const fundPaidCash = funding.filter(x=>x.destination==='platform').reduce((s,x)=> s + fundingPaymentsOf(x).filter(pm=>pm.method==='cash').reduce((a,pm)=>a+pm.amount,0), 0);
+  const fundPaidSham = funding.filter(x=>x.destination==='platform').reduce((s,x)=> s + fundingPaymentsOf(x).filter(pm=>pm.method==='shamcash').reduce((a,pm)=>a+pm.amount,0), 0);
   // دفعات وصلت من المنصة نفسها لتغطية ربح لاعب (تضاف تمامًا متل تمويل المموّل، بس مصدرها مختلف لغرض التقارير)
   const platformIn = data.platformPayins || [];
   const platformCash = platformIn.filter(x=>x.destination==='cash').reduce((s,x)=>s+x.amount,0);
@@ -1917,8 +1948,31 @@ function getWalletTotals(){
 function getTotalTransferFee(){
   return (data.walletTransfers||[]).reduce((s,x)=> s + transferFee(x), 0);
 }
+// دفعات شحن المنصة: كل تمويل للمنصة فيه paidAmount إلو دفعات (payments) من الكاش/شام كاش.
+// السجلات القديمة (paySource كاش/شام كاش بدون payments) بتنعتبر مدفوعة كاملة بمصدرها.
+function fundingPaymentsOf(x){
+  if(x.destination!=='platform') return [];
+  if(Array.isArray(x.payments)) return x.payments;
+  if(x.paySource==='cash' || x.paySource==='shamcash') return [{ amount: x.paidAmount!==undefined ? x.paidAmount : x.amount, method: x.paySource }];
+  return [];
+}
+function fundingPaidTotal(x){ return fundingPaymentsOf(x).reduce((s,pm)=>s+pm.amount,0); }
+function fundingOwed(x){
+  if(x.destination!=='platform' || x.paidAmount===undefined) return 0;
+  return Math.max(0, x.paidAmount - fundingPaidTotal(x));
+}
+function getTotalFundingOwed(){
+  return (data.walletFunding||[]).reduce((s,x)=> s + fundingOwed(x), 0);
+}
 function getTotalFundingFee(){
   return (data.walletFunding||[]).reduce((s,x)=> s + (x.fee||0), 0);
+}
+// العمولة "المتحققة" = بس حصة المبلغ يلي انسدد فعليًا (حتى يضل الرقم الخام ثابت)
+function getRecognizedFundingFee(){
+  return (data.walletFunding||[]).reduce((s,x)=>{
+    if(!x.fee || !x.paidAmount) return s;
+    return s + x.fee * Math.min(1, fundingPaidTotal(x) / x.paidAmount);
+  }, 0);
 }
 // عمولة كل كاشير محسوبة على كامل تاريخه (مسدد - ممرّر) × نسبته% — بدون تقييد بشهر،
 // لأن أرصدة المحفظة نفسها متل هيك محسوبة على كامل التاريخ مش على شهر معيّن.
@@ -1937,14 +1991,16 @@ function renderWalletBalance(){
   if(!el) return;
   const { cashBalance, shamBalance, platformBalance } = getWalletTotals();
   const totalTransferFee = getTotalTransferFee() + getTotalFundingFee();
+  const rawFee = getTotalTransferFee() + getRecognizedFundingFee();
+  const fundingOwedTotal = getTotalFundingOwed();
   // "قبل العمولة" = إجمالي خام ثابت، ما بينخصم منه أي عمولة تحويل تلقائيًا مع كل تحويل تسويه.
   // أرصدة المحافظ الفعلية (cashBalance/shamBalance/platformBalance) هي المبلغ الحقيقي الموجود فعليًا بكل محفظة،
   // وهاد أصلاً متأثر بخصم عمولة التحويلات (لأنه هيك المصاري الحقيقية تنخصم). فلحساب "الخام" بنرجع نضيف عمولة
   // التحويلات مرة وحدة على مجموع الأرصدة الفعلية، حتى يضل الرقم الخام ثابت ومش منخفض تلقائيًا مع كل تحويل.
-  const totalBeforeCommission = cashBalance + shamBalance + platformBalance + totalTransferFee;
+  const totalBeforeCommission = cashBalance + shamBalance + platformBalance + rawFee;
   // رأس المال = كل الديون المعلّقة (على كل الكاشيرات، كل الوقت) + أرصدة المحافظ الفعلية الثلاثة.
   const totalPendingAll = data.transactions.filter(t=>t.type==='charge').reduce((s,t)=>s+remainingOf(t),0);
-  const totalCapital = totalPendingAll + platformBalance + cashBalance + shamBalance;
+  const totalCapital = totalPendingAll + platformBalance + cashBalance + shamBalance - fundingOwedTotal;
   el.innerHTML = `
     <div class="stat-row" style="margin-bottom:10px;">
       <div class="stat" style="background:var(--green-soft);">
@@ -1974,6 +2030,12 @@ function renderWalletBalance(){
         <p class="v mono" style="color:var(--rust);">${fmt(totalTransferFee)}</p>
       </div>
     </div>
+    ${fundingOwedTotal>0 ? `<div class="stat-row" style="margin-bottom:10px;">
+      <div class="stat" style="background:var(--rust-soft); cursor:pointer;" onclick="openPendingFundingPicker()">
+        <p class="k" style="color:var(--rust);">⏳ دين شحن المنصة المعلّق (اضغط للتسديد)</p>
+        <p class="v mono" style="color:var(--rust);">${fmt(fundingOwedTotal)}</p>
+      </div>
+    </div>` : ''}
     <div class="stat-row">
       <div class="stat" style="background:var(--green-soft);">
         <p class="k" style="color:var(--green);">🏛️ مجموع رأس المال</p>
@@ -2105,10 +2167,12 @@ function refreshFundingPlatformUI(){
   document.getElementById('fundingSrcCash').classList.toggle('sel', fundingPaySource==='cash');
   document.getElementById('fundingSrcSham').classList.toggle('sel', fundingPaySource==='shamcash');
   document.getElementById('fundingSrcExt').classList.toggle('sel', fundingPaySource==='external');
+  document.getElementById('fundingSrcPending').classList.toggle('sel', fundingPaySource==='pending');
+  document.getElementById('fundingPendingHint').style.display = (isPlat && fundingPaySource==='pending') ? 'block' : 'none';
   const hasSrc = isPlat && fundingPaySource!=='external';
   document.getElementById('fundingReceivedField').style.display = hasSrc ? 'block' : 'none';
   document.getElementById('fundingAmountLabel').textContent = hasSrc
-    ? 'المبلغ المدفوع من ' + (fundingPaySource==='cash' ? 'الكاش' : 'شام كاش') + ' (ل.س)'
+    ? (fundingPaySource==='pending' ? 'المبلغ المستحق عليك للدفع (ل.س)' : 'المبلغ المدفوع من ' + (fundingPaySource==='cash' ? 'الكاش' : 'شام كاش') + ' (ل.س)')
     : 'المبلغ (ل.س)';
   updateFundingFeePreview();
 }
@@ -2127,12 +2191,21 @@ function openFundingSheet(id){
   editingFundingId = id || null;
   const f = editingFundingId ? (data.walletFunding||[]).find(x=>x.id===editingFundingId) : null;
   fundingPaySource = f ? (f.paySource || 'external') : 'cash';
+  if(f && f.destination==='platform' && f.paySource===undefined) fundingPaySource = 'external';
   document.getElementById('fundingAmount').value = f ? (f.paidAmount!==undefined ? f.paidAmount : f.amount) : '';
   document.getElementById('fundingReceived').value = (f && f.paySource) ? f.amount : '';
   document.getElementById('fundingNote').value = f ? (f.note||'') : '';
   document.getElementById('fundingDate').value = f ? f.date : todayISO();
   setFundingDestination(f ? f.destination : 'cash');
   document.getElementById('fundingSheetTitle').textContent = f ? 'تعديل دفعة تمويل' : 'دفعة تمويل من المموّل الرئيسي';
+  const debtBox = document.getElementById('fundingDebtBox');
+  if(f && f.destination==='platform' && f.paidAmount!==undefined){
+    debtBox.style.display = 'block';
+    const owed = fundingOwed(f);
+    document.getElementById('fundingDebtInfo').textContent = owed>0
+      ? `المستحق ${fmt(f.paidAmount)} — انسدد ${fmt(fundingPaidTotal(f))} — الباقي ${fmt(owed)} ل.س`
+      : `المستحق ${fmt(f.paidAmount)} — مسدَّد بالكامل ✅`;
+  } else { debtBox.style.display = 'none'; }
   document.getElementById('fundingDeleteBtn').style.display = f ? 'block' : 'none';
   document.getElementById('fundingOverlay').classList.add('show');
 }
@@ -2154,13 +2227,25 @@ function saveFunding(){
     amount = recv;
     paySrc = fundingPaySource;
   }
+  // الدفعات: كاش/شام كاش = دفعة وحدة كاملة هلأ، معلّق = بدون دفعات (أو بنحافظ على الدفعات الجزئية السابقة عند التعديل)
+  let payments = null;
+  if(paySrc){
+    const existing = editingFundingId ? data.walletFunding.find(x=>x.id===editingFundingId) : null;
+    if(paySrc==='pending'){
+      payments = (existing && existing.paySource==='pending' && Array.isArray(existing.payments)) ? existing.payments : [];
+      const paidSoFar = payments.reduce((a,pm)=>a+pm.amount,0);
+      if(paidSoFar > paidAmount){ showToast('المستحق أقل من المبلغ يلي سددته سابقًا'); return; }
+    } else {
+      payments = [{ id: uid(), amount: paidAmount, method: paySrc, date, time: nowTime() }];
+    }
+  }
   if(editingFundingId){
     const f = data.walletFunding.find(x=>x.id===editingFundingId);
     if(f){
       const before = { ...f };
       f.amount = amount; f.destination = fundingDestination; f.date = date; f.note = note;
-      if(paySrc){ f.paySource = paySrc; f.paidAmount = paidAmount; f.fee = fee; }
-      else { delete f.paySource; delete f.paidAmount; delete f.fee; }
+      if(paySrc){ f.paySource = paySrc; f.paidAmount = paidAmount; f.fee = fee; f.payments = payments; }
+      else { delete f.paySource; delete f.paidAmount; delete f.fee; delete f.payments; }
       const changes = [];
       if(before.amount!==f.amount) changes.push(`المبلغ: ${fmt(before.amount)} ⬅ ${fmt(f.amount)} ل.س`);
       if(before.destination!==f.destination) changes.push(`الوجهة: ${WALLET_LABELS[before.destination]} ⬅ ${WALLET_LABELS[f.destination]}`);
@@ -2175,13 +2260,93 @@ function saveFunding(){
     return;
   }
   const newF = { id: uid(), amount, destination: fundingDestination, date, time: nowTime(), note };
-  if(paySrc){ newF.paySource = paySrc; newF.paidAmount = paidAmount; newF.fee = fee; }
+  if(paySrc){ newF.paySource = paySrc; newF.paidAmount = paidAmount; newF.fee = fee; newF.payments = payments; }
   data.walletFunding.push(newF);
   logActivity('تمويل من المموّل الرئيسي', `${WALLET_LABELS[fundingDestination]} — ${fmt(amount)} ل.س`);
   saveData();
   closeSheet('fundingOverlay');
   renderAll();
   showToast('تم تسجيل التمويل');
+}
+// ---------- تسديد شحن المنصة المعلّق ----------
+let payingFundingId = null;
+let fundingPayMethod = 'cash';
+function setFundingPayMethod(m){
+  fundingPayMethod = m;
+  document.getElementById('fundingPayCash').classList.toggle('sel', m==='cash');
+  document.getElementById('fundingPaySham').classList.toggle('sel', m==='shamcash');
+}
+function openFundingPaySheet(id){
+  const f = (data.walletFunding||[]).find(x=>x.id===id);
+  if(!f) return;
+  payingFundingId = id;
+  closeSheet('fundingOverlay');
+  renderFundingPaySheet();
+  setFundingPayMethod('cash');
+  document.getElementById('fundingPayDate').value = todayISO();
+  document.getElementById('fundingPayOverlay').classList.add('show');
+}
+function renderFundingPaySheet(){
+  const f = (data.walletFunding||[]).find(x=>x.id===payingFundingId);
+  if(!f) return;
+  const owed = fundingOwed(f);
+  document.getElementById('fundingPayInfo').textContent =
+    `المستحق ${fmt(f.paidAmount)} ل.س — انسدد ${fmt(fundingPaidTotal(f))} — الباقي ${fmt(owed)}`;
+  document.getElementById('fundingPayAmount').value = owed>0 ? owed : '';
+  const pays = Array.isArray(f.payments) ? f.payments : [];
+  document.getElementById('fundingPayHistory').innerHTML = pays.length
+    ? '<p style="font-size:12.5px;color:var(--ink-soft);margin-bottom:6px;">التسديدات السابقة:</p>' + pays.map(pm=>
+        `<div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:6px 0;border-bottom:1px solid var(--line);">
+          <span>${fmtDT(pm)} · ${pm.method==='cash'?'كاش':'شام كاش'} · <span class="mono">${fmt(pm.amount)}</span></span>
+          ${pm.id ? `<button type="button" style="color:var(--rust);background:none;border:none;font-size:13px;" onclick="deleteFundingPayment('${pm.id}')">حذف</button>` : ''}
+        </div>`).join('')
+    : '';
+}
+function saveFundingPay(){
+  const f = (data.walletFunding||[]).find(x=>x.id===payingFundingId);
+  if(!f) return;
+  const amount = Number(document.getElementById('fundingPayAmount').value);
+  const owed = fundingOwed(f);
+  if(!amount || amount<=0){ showToast('أدخل مبلغ صحيح'); return; }
+  if(amount > owed){ showToast('المبلغ أكبر من المتبقي عليك (' + fmt(owed) + ')'); return; }
+  const date = document.getElementById('fundingPayDate').value || todayISO();
+  if(date > todayISO()){ showToast('التاريخ ما لازم يكون بالمستقبل'); return; }
+  if(!Array.isArray(f.payments)) f.payments = fundingPaymentsOf(f).map(pm=>({ id: uid(), ...pm, date: f.date }));
+  f.payments.push({ id: uid(), amount, method: fundingPayMethod, date, time: nowTime() });
+  logActivity('تسديد شحن منصة', `${fmt(amount)} ل.س من ${fundingPayMethod==='cash'?'الكاش':'شام كاش'} — الباقي ${fmt(fundingOwed(f))}`);
+  saveData();
+  renderAll();
+  if(fundingOwed(f) > 0){ renderFundingPaySheet(); }
+  else { closeSheet('fundingPayOverlay'); }
+  showToast('تم تسجيل التسديد');
+}
+function deleteFundingPayment(pid){
+  const f = (data.walletFunding||[]).find(x=>x.id===payingFundingId);
+  if(!f || !Array.isArray(f.payments)) return;
+  const pm = f.payments.find(x=>x.id===pid);
+  if(!pm) return;
+  f.payments = f.payments.filter(x=>x.id!==pid);
+  logActivity('حذف تسديد شحن منصة', `${fmt(pm.amount)} ل.س`);
+  saveData();
+  renderAll();
+  renderFundingPaySheet();
+  showToast('تم حذف التسديد');
+}
+// اختيار دفعة معلّقة من البطاقة (إذا في أكثر من وحدة)
+function openPendingFundingPicker(){
+  const pending = (data.walletFunding||[]).filter(x=>fundingOwed(x)>0);
+  if(pending.length===0) return;
+  if(pending.length===1){ openFundingPaySheet(pending[0].id); return; }
+  payingFundingId = null;
+  const box = document.getElementById('fundingPayHistory');
+  document.getElementById('fundingPayInfo').textContent = 'اختر الدفعة يلي بدك تسددها:';
+  document.getElementById('fundingPayAmount').value = '';
+  box.innerHTML = pending.map(x=>
+    `<div class="row" style="cursor:pointer;" onclick="openFundingPaySheet('${x.id}')">
+      <div class="main"><p class="name">${fmtDT(x)}</p><p class="sub">${x.note ? escapeHTML(x.note) : ''}</p></div>
+      <div class="amount mono pending">${fmt(fundingOwed(x))}</div>
+    </div>`).join('');
+  document.getElementById('fundingPayOverlay').classList.add('show');
 }
 function deleteFunding(){
   if(!editingFundingId) return;
@@ -2478,8 +2643,8 @@ function renderWalletHistory(){
     }
     const sub = x.kind==='transfer'
       ? `<span>${fmtDT(x)}</span> · حوّل ${fmt(transferSent(x))}${transferFee(x)>0 ? ' · عمولة '+fmt(transferFee(x)) : ''}${x.note ? ' · '+escapeHTML(x.note) : ''}`
-      : (x.kind==='funding' && x.paySource)
-        ? `<span>${fmtDT(x)}</span> · دفعت ${fmt(x.paidAmount)} من ${x.paySource==='cash'?'الكاش':'شام كاش'}${x.fee>0 ? ' · عمولة '+fmt(x.fee) : ''}${x.note ? ' · '+escapeHTML(x.note) : ''}`
+      : (x.kind==='funding' && x.paidAmount!==undefined)
+        ? `<span>${fmtDT(x)}</span> · مستحق ${fmt(x.paidAmount)}${fundingOwed(x)>0 ? ' · <b style="color:var(--rust);">باقي '+fmt(fundingOwed(x))+' معلّق</b>' : ' · مسدَّد'}${x.fee>0 ? ' · عمولة '+fmt(x.fee) : ''}${x.note ? ' · '+escapeHTML(x.note) : ''}`
         : `<span>${fmtDT(x)}</span>${x.note ? '· '+escapeHTML(x.note) : ''}`;
     return `<div class="row"${clickAttr}>
       <div class="main">
