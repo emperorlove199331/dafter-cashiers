@@ -1321,17 +1321,18 @@ function computeTotals(){
 
 function monthTotals(monthStr){
   // monthStr like 2026-09
-  let income=0, pending=0, payouts=0;
+  // دخل الشهر = كل ما شحنته للكاشيرات بهالشهر (حتى لو لسا معلّق، وبغض النظر عن تاريخ السداد) − الأرباح الممرّرة
+  let charged=0, pending=0, payouts=0;
   data.transactions.forEach(t=>{
     if(!t.date || !t.date.startsWith(monthStr)) return;
     if(t.type==='charge'){
-      income += paidAmountOf(t);
+      charged += t.amount;
       pending += remainingOf(t);
     } else if(t.type==='payout'){
       payouts += t.amount;
     }
   });
-  return {income, pending, payouts};
+  return {income: charged - payouts, charged, pending, payouts};
 }
 
 // ---------- Rendering ----------
@@ -1588,17 +1589,19 @@ function renderReport(){
   renderBackupReminder();
   let rows = data.cashiers.map(c=>{
     const txns = data.transactions.filter(t=>t.cashierId===c.id && t.date && t.date.startsWith(monthStr));
+    const charged = txns.filter(t=>t.type==='charge').reduce((s,t)=>s+t.amount,0);
     const paid = txns.filter(t=>t.type==='charge').reduce((s,t)=>s+paidAmountOf(t),0);
     const pending = txns.filter(t=>t.type==='charge').reduce((s,t)=>s+remainingOf(t),0);
     const payouts = txns.filter(t=>t.type==='payout').reduce((s,t)=>s+t.amount,0);
-    return {id:c.id, name:c.name, paid, pending, payouts, net: paid-payouts, count: txns.length};
+    return {id:c.id, name:c.name, charged, paid, pending, payouts, net: charged-payouts, count: txns.length};
   });
 
   const summaryEl = document.getElementById('reportSummary');
+  const totalCharged = rows.reduce((s,r)=>s+r.charged,0);
   const totalPaid = rows.reduce((s,r)=>s+r.paid,0);
   const totalPending = rows.reduce((s,r)=>s+r.pending,0);
   const totalPayouts = rows.reduce((s,r)=>s+r.payouts,0);
-  const totalNet = totalPaid - totalPayouts;
+  const totalNet = totalCharged - totalPayouts;
   summaryEl.innerHTML = `
     <div class="stat-row" style="margin-bottom:8px;">
       <div class="stat" style="background:var(--green-soft);">
@@ -1616,12 +1619,12 @@ function renderReport(){
         <p class="v mono" style="color:var(--brass);">${fmt(totalPayouts)}</p>
       </div>
       <div class="stat" style="background:var(--paper-raised); border:1px solid var(--line);">
-        <p class="k">الصافي (مسدد - ممرّر)</p>
+        <p class="k">دخل الشهر (شحن − ممرّر) — ${fmt(totalCharged)} − ${fmt(totalPayouts)}</p>
         <p class="v mono">${fmt(totalNet)}</p>
       </div>
     </div>`;
 
-  rows = rows.sort((a,b)=> b.paid - a.paid);
+  rows = rows.sort((a,b)=> b.charged - a.charged);
 
   const el = document.getElementById('reportTable');
   if(rows.length===0){
@@ -1632,7 +1635,7 @@ function renderReport(){
     <div class="row" onclick="switchView('cashiers'); openCashierDetail('${r.id}', '${monthStr}');" style="cursor:pointer;">
       <div class="main">
         <p class="name">${escapeHTML(r.name)} <span style="font-weight:400;color:var(--ink-soft);font-size:12px;">(${r.count} عملية)</span></p>
-        <p class="sub">مسدد <span class="mono">${fmt(r.paid)}</span> · معلّق <span class="mono">${fmt(r.pending)}</span> · ممرّر <span class="mono">${fmt(r.payouts)}</span></p>
+        <p class="sub">شحن <span class="mono">${fmt(r.charged)}</span> · مسدد <span class="mono">${fmt(r.paid)}</span> · معلّق <span class="mono">${fmt(r.pending)}</span> · ممرّر <span class="mono">${fmt(r.payouts)}</span></p>
       </div>
       <div class="amount mono ${r.net>=0?'in':'pending'}">${fmt(r.net)}</div>
     </div>`).join('');
@@ -1677,9 +1680,7 @@ function renderIncomeTrend(){
     const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
     months.push(localMonthStr(d));
   }
-  const values = months.map(m=> data.transactions
-    .filter(t=>t.type==='charge' && t.date && t.date.startsWith(m))
-    .reduce((s,t)=>s+paidAmountOf(t),0));
+  const values = months.map(m=> Math.max(0, monthTotals(m).income));
   const max = Math.max(...values, 1);
   const w = 320, h = 100, slot = w/months.length, barW = slot - 10;
   let bars = '';
@@ -1697,11 +1698,13 @@ function printMonthlyReport(){
   const monthStr = document.getElementById('reportMonth').value;
   const rows = data.cashiers.map(c=>{
     const txns = data.transactions.filter(t=>t.cashierId===c.id && t.date && t.date.startsWith(monthStr));
+    const charged = txns.filter(t=>t.type==='charge').reduce((s,t)=>s+t.amount,0);
     const paid = txns.filter(t=>t.type==='charge').reduce((s,t)=>s+paidAmountOf(t),0);
     const pending = txns.filter(t=>t.type==='charge').reduce((s,t)=>s+remainingOf(t),0);
     const payouts = txns.filter(t=>t.type==='payout').reduce((s,t)=>s+t.amount,0);
-    return {name:c.name, paid, pending, payouts, net:paid-payouts};
+    return {name:c.name, charged, paid, pending, payouts, net:charged-payouts};
   });
+  const totalCharged = rows.reduce((s,r)=>s+r.charged,0);
   const totalPaid = rows.reduce((s,r)=>s+r.paid,0);
   const totalPending = rows.reduce((s,r)=>s+r.pending,0);
   const totalPayouts = rows.reduce((s,r)=>s+r.payouts,0);
@@ -1717,10 +1720,10 @@ function printMonthlyReport(){
   </style></head><body>
   <h1>تقرير دفتر الكاشيرات — ${monthStr}</h1>
   <table>
-    <tr><th>الكاشير</th><th>مسدد</th><th>معلّق</th><th>ممرّر</th><th>الصافي</th></tr>
-    ${rows.map(r=>`<tr><td>${r.name}</td><td>${fmt(r.paid)}</td><td>${fmt(r.pending)}</td><td>${fmt(r.payouts)}</td><td>${fmt(r.net)}</td></tr>`).join('')}
+    <tr><th>الكاشير</th><th>شحن</th><th>مسدد</th><th>معلّق</th><th>ممرّر</th><th>الدخل</th></tr>
+    ${rows.map(r=>`<tr><td>${r.name}</td><td>${fmt(r.charged)}</td><td>${fmt(r.paid)}</td><td>${fmt(r.pending)}</td><td>${fmt(r.payouts)}</td><td>${fmt(r.net)}</td></tr>`).join('')}
   </table>
-  <p class="totals">الإجمالي — مسدد: ${fmt(totalPaid)} | معلّق: ${fmt(totalPending)} | ممرّر: ${fmt(totalPayouts)} | الصافي: ${fmt(totalPaid-totalPayouts)}</p>
+  <p class="totals">الإجمالي — شحن: ${fmt(totalCharged)} | مسدد: ${fmt(totalPaid)} | معلّق: ${fmt(totalPending)} | ممرّر: ${fmt(totalPayouts)} | الدخل: ${fmt(totalCharged-totalPayouts)}</p>
   </body></html>`;
 
   const iframe = document.createElement('iframe');
@@ -3682,6 +3685,66 @@ if('serviceWorker' in navigator){
     navigator.serviceWorker.register('service-worker.js').catch(function(){});
   });
 }
+</script>
+
+<script>
+// فواصل الآلاف بكل خانات الأرقام (100,000) — القيمة يلي بيقراها الكود بتضل رقم صافي بدون فواصل
+(function(){
+  const desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+  function clean(v){
+    v = String(v==null ? '' : v)
+      .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+      .replace(/٫/g, '.')
+      .replace(/[٬،,\s]/g, '');
+    const neg = v.charAt(0)==='-';
+    v = v.replace(/[^0-9.]/g, '');
+    const i = v.indexOf('.');
+    if(i !== -1) v = v.slice(0, i+1) + v.slice(i+1).replace(/\./g, '');
+    return (neg ? '-' : '') + v;
+  }
+  function group(v){
+    const neg = v.charAt(0)==='-';
+    if(neg) v = v.slice(1);
+    const i = v.indexOf('.');
+    let ip = i===-1 ? v : v.slice(0, i);
+    const fp = i===-1 ? '' : v.slice(i);
+    ip = ip.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return (neg ? '-' : '') + ip + fp;
+  }
+  function enhance(inp){
+    if(inp._fmt || inp.type !== 'number') return;
+    inp._fmt = true;
+    const initial = desc.get.call(inp);
+    inp.type = 'text';
+    inp.setAttribute('inputmode', 'decimal');
+    inp.setAttribute('autocomplete', 'off');
+    Object.defineProperty(inp, 'value', {
+      configurable: true,
+      get(){ return clean(desc.get.call(this)); },
+      set(v){ desc.set.call(this, group(clean(v))); }
+    });
+    desc.set.call(inp, group(clean(initial)));
+    inp.addEventListener('input', function(){
+      const raw = desc.get.call(inp);
+      const pos = inp.selectionStart == null ? raw.length : inp.selectionStart;
+      const before = clean(raw.slice(0, pos)).length;
+      const f = group(clean(raw));
+      if(f !== raw){
+        desc.set.call(inp, f);
+        let cnt = 0, np = 0;
+        while(np < f.length && cnt < before){ if(f.charAt(np) !== ',') cnt++; np++; }
+        try{ inp.setSelectionRange(np, np); }catch(e){}
+      }
+    });
+  }
+  function scan(root){
+    if(root.nodeType !== 1) return;
+    if(root.matches && root.matches('input[type="number"]')) enhance(root);
+    root.querySelectorAll && root.querySelectorAll('input[type="number"]').forEach(enhance);
+  }
+  scan(document.body);
+  new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(scan))).observe(document.body, {childList:true, subtree:true});
+})();
 </script>
 </body>
 </html>
