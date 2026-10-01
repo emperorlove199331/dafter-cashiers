@@ -405,7 +405,7 @@
       <p class="v mono" id="statIncome">0</p>
     </div>
     <div class="stat">
-      <p class="k">معلّق</p>
+      <p class="k">معلّق (كل الأشهر)</p>
       <p class="v mono" id="statPending">0</p>
     </div>
     <div class="stat">
@@ -1358,7 +1358,7 @@ function renderHeader(){
   // مجموع شحن الكاشيرات للشهر الحالي فقط — بيصفّر لحاله مع بداية كل شهر جديد
   document.getElementById('capitalDisplay').innerHTML = fmt(mt.charged) + ' <small>ل.س</small>';
   document.getElementById('statIncome').textContent = fmt(mt.income);
-  document.getElementById('statPending').textContent = fmt(mt.pending);
+  document.getElementById('statPending').textContent = fmt(t.pendingCharges);  // معلّق تراكمي: ديون كل الأشهر
   document.getElementById('statPayouts').textContent = fmt(mt.payouts);
 
   const net = mt.income;
@@ -2769,7 +2769,7 @@ let txnType = 'charge', txnMethod = 'cash', txnStatus = 'paid', txnFundingSource
 // ---------- تمرير ربح ذكي: تسديد دين اللاعب من الربح ----------
 let smartSettleOn = true;
 function openDebtsOf(cashierId){
-  return data.transactions.filter(x=> x.type==='charge' && x.cashierId===cashierId && remainingOf(x)>0 && !isMonthLocked((x.date||'').slice(0,7)));
+  return data.transactions.filter(x=> x.type==='charge' && x.cashierId===cashierId && remainingOf(x)>0);  // حساب جارٍ: ديون كل الأشهر (حتى المقفولة) بتنسدّد الأقدم أولاً
 }
 function enteredAmountSYP(){
   let a = Number(document.getElementById('txnAmount').value) || 0;
@@ -2840,7 +2840,8 @@ function applySmartPayout(t){
   data.platformPayins.push({ id: uid(), amount: t.amount, destination:'platform', date: t.date, time: t.time, note: 'ربح ' + cashierName(t.cashierId) + ' (تمرير ربح)', smartId: sid });
 }
 function smartLockedCharges(sid){
-  return data.transactions.some(d=> d.type==='charge' && Array.isArray(d.payments) && d.payments.some(p=>p.smartId===sid) && isMonthLocked((d.date||'').slice(0,7)));
+  // التسديد ما بيغيّر دخل الشهر المقفول (الدخل على تاريخ الشحنة)، فما بنمنع التراجع عنه
+  return false;
 }
 function reverseSmartPayout(sid){
   data.platformPayins = (data.platformPayins||[]).filter(p=>p.smartId!==sid);
@@ -3123,7 +3124,6 @@ function setSettleMethod(m){
 function confirmSettle(){
   const t = data.transactions.find(x=>x.id===settleTxnId);
   if(!t) return;
-  if(isMonthLocked((t.date||'').slice(0,7))){ showToast('هذا الشهر مقفول، افتح القفل من صفحة التقرير الأول'); return; }
   const remaining = remainingOf(t);
   const entered = Number(document.getElementById('settleAmount').value);
   if(!entered || entered<=0){ showToast('أدخل مبلغ صحيح'); return; }
@@ -3163,7 +3163,7 @@ function setSettleAccountMethod(m){
   document.getElementById('settleAccountShamCash').classList.toggle('sel', m==='shamcash');
   document.getElementById('settleAccountPlatform').classList.toggle('sel', m==='platform');
 }
-// نفس ديون الكاشير المعلّقة المستخدمة بميزة "تمرير ربح ذكي" (openDebtsOf) — غير مقفولة، مرتّبة الأقدم أولاً
+// نفس ديون الكاشير المعلّقة المستخدمة بميزة "تمرير ربح ذكي" (openDebtsOf) — كل الأشهر، مرتّبة الأقدم أولاً
 function sortedDebtsOf(cashierId){
   return openDebtsOf(cashierId).sort((a,b)=> sortKey(a).localeCompare(sortKey(b)));
 }
@@ -3173,7 +3173,7 @@ function updateSettleAccountPreview(){
   const box = document.getElementById('settleAccountPreview');
   if(!cashierId || amount<=0){ box.innerHTML = 'أدخل مبلغاً لمعاينة كيف رح يتوزع.'; return; }
   const debts = sortedDebtsOf(cashierId);
-  if(debts.length===0){ box.innerHTML = 'ما في ديون معلّقة (غير مقفولة) على هذا الكاشير حالياً.'; return; }
+  if(debts.length===0){ box.innerHTML = 'ما في ديون معلّقة على هذا الكاشير حالياً.'; return; }
   let left = amount, lines = [];
   for(const t of debts){
     if(left<=0) break;
