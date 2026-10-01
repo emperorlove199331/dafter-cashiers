@@ -396,7 +396,7 @@
     <p>45% <span class="val" id="pct45">0</span></p>
   </div>
   <div class="head-main">
-    <p class="label">إجمالي الشحن للكاشيرات</p>
+    <p class="label">إجمالي الشحن للكاشيرات (هالشهر)</p>
     <p class="capital mono" id="capitalDisplay">0 <small>ل.س</small></p>
   </div>
   <div class="stat-row">
@@ -811,6 +811,20 @@
     <button class="btn-primary" onclick="saveFunding()">حفظ التمويل</button>
     <button class="btn-secondary" id="fundingDeleteBtn" style="display:none;color:var(--rust); border-color:var(--rust-soft);" onclick="deleteFunding()">حذف دفعة التمويل</button>
     <button class="btn-secondary" onclick="closeSheet('fundingOverlay')">إلغاء</button>
+  </div>
+</div>
+
+<div class="overlay" id="monthLockOverlay">
+  <div class="sheet">
+    <h3>اختيار الأشهر المقفولة</h3>
+    <p style="font-size:13px;color:var(--ink-soft);margin-bottom:8px;">علّم الأشهر يلي بدك تقفلها (القفل بيمنع التعديل والحذف على عملياتها)، وشيل العلامة عن يلي بدك تفتحها.</p>
+    <div class="btn-row" style="margin-bottom:6px;">
+      <button class="btn-secondary" onclick="monthLockSelectAll(true)">تحديد الكل</button>
+      <button class="btn-secondary" onclick="monthLockSelectAll(false)">إلغاء الكل</button>
+    </div>
+    <div id="monthLockList" style="max-height:45vh;overflow-y:auto;margin-bottom:12px;"></div>
+    <button class="btn-primary" onclick="saveMonthLockSheet()">حفظ</button>
+    <button class="btn-secondary" onclick="closeSheet('monthLockOverlay')">إلغاء</button>
   </div>
 </div>
 
@@ -1338,10 +1352,11 @@ function monthTotals(monthStr){
 // ---------- Rendering ----------
 function renderHeader(){
   const t = computeTotals();
-  document.getElementById('capitalDisplay').innerHTML = fmt(t.capital) + ' <small>ل.س</small>';
   const now = new Date();
   const monthStr = localMonthStr(now);
   const mt = monthTotals(monthStr);
+  // مجموع شحن الكاشيرات للشهر الحالي فقط — بيصفّر لحاله مع بداية كل شهر جديد
+  document.getElementById('capitalDisplay').innerHTML = fmt(mt.charged) + ' <small>ل.س</small>';
   document.getElementById('statIncome').textContent = fmt(mt.income);
   document.getElementById('statPending').textContent = fmt(mt.pending);
   document.getElementById('statPayouts').textContent = fmt(mt.payouts);
@@ -1654,6 +1669,46 @@ function renderMonthLockBox(monthStr){
         <p style="margin:0; font-size:13.5px; color:var(--ink-soft);">لما تخلّص مراجعة هذا الشهر، اقفله لمنع أي تعديل بالغلط.</p>
         <button class="btn-secondary" style="flex:0 0 auto; white-space:nowrap;" onclick="toggleMonthLock('${monthStr}')">🔒 قفل الشهر</button>
       </div>`;
+  el.innerHTML += `<button class="btn-secondary" style="margin-top:8px;" onclick="openMonthLockSheet()">🗓️ اختيار أشهر للقفل / الفتح (عدة أشهر)</button>`;
+}
+let monthLockSel = new Set();
+function openMonthLockSheet(){
+  const set = new Set();
+  data.transactions.forEach(t=>{ if(t.date) set.add(t.date.slice(0,7)); });
+  (data.lockedMonths||[]).forEach(m=>set.add(m));
+  set.add(localMonthStr(new Date()));
+  const months = Array.from(set).sort().reverse();
+  monthLockSel = new Set(data.lockedMonths||[]);
+  document.getElementById('monthLockList').innerHTML = months.map(m=>{
+    const cnt = data.transactions.filter(t=>t.date && t.date.startsWith(m)).length;
+    const [y,mo] = m.split('-');
+    return `<label style="display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px solid var(--line);cursor:pointer;">
+      <input type="checkbox" data-month="${m}" ${monthLockSel.has(m)?'checked':''} style="width:20px;height:20px;" onchange="toggleMonthLockSel('${m}', this.checked)">
+      <span class="mono" style="flex:1;">${mo}/${y}</span>
+      <span style="font-size:12.5px;color:var(--ink-soft);">${cnt} عملية</span>
+    </label>`;
+  }).join('');
+  document.getElementById('monthLockOverlay').classList.add('show');
+}
+function toggleMonthLockSel(m, on){ if(on) monthLockSel.add(m); else monthLockSel.delete(m); }
+function monthLockSelectAll(on){
+  document.querySelectorAll('#monthLockList input[type=checkbox]').forEach(cb=>{
+    cb.checked = on; toggleMonthLockSel(cb.dataset.month, on);
+  });
+}
+function saveMonthLockSheet(){
+  const before = new Set(data.lockedMonths||[]);
+  const after = monthLockSel;
+  const locked = Array.from(after).filter(m=>!before.has(m));
+  const opened = Array.from(before).filter(m=>!after.has(m));
+  if(locked.length===0 && opened.length===0){ closeSheet('monthLockOverlay'); return; }
+  data.lockedMonths = Array.from(after).sort();
+  if(locked.length) logActivity('قفل أشهر', locked.join(', '));
+  if(opened.length) logActivity('فتح قفل أشهر', opened.join(', '));
+  saveData();
+  closeSheet('monthLockOverlay');
+  renderAll();
+  showToast('تم تحديث أقفال الأشهر');
 }
 function toggleMonthLock(monthStr){
   if(!data.lockedMonths) data.lockedMonths = [];
@@ -2007,12 +2062,18 @@ function renderFundingPending(){
   list.innerHTML = `<div class="stat-row" style="margin-bottom:10px;"><div class="stat" style="background:var(--rust-soft);">
       <p class="k" style="color:var(--rust);">إجمالي المستحق عليك</p>
       <p class="v mono" style="color:var(--rust);">${fmt(total)}</p></div></div>` +
-    pending.map(x=>`<div class="row" style="cursor:pointer;" onclick="openFundingPaySheet('${x.id}')">
-      <div class="main">
-        <p class="name">شحن المنصة — واصل ${fmt(x.amount)}</p>
-        <p class="sub"><span>${fmtDT(x)}</span> · مستحق ${fmt(x.paidAmount)}${fundingPaidTotal(x)>0 ? ' · انسدد '+fmt(fundingPaidTotal(x)) : ''}${x.note ? ' · '+escapeHTML(x.note) : ''}</p>
+    pending.map(x=>`<div style="margin-bottom:12px;">
+      <div class="row">
+        <div class="main">
+          <p class="name">شحن المنصة — واصل ${fmt(x.amount)}</p>
+          <p class="sub"><span>${fmtDT(x)}</span> · مستحق ${fmt(x.paidAmount)}${fundingPaidTotal(x)>0 ? ' · انسدد '+fmt(fundingPaidTotal(x)) : ''}${x.note ? ' · '+escapeHTML(x.note) : ''}</p>
+        </div>
+        <div class="amount mono pending">${fmt(fundingOwed(x))}</div>
       </div>
-      <div class="amount mono pending">${fmt(fundingOwed(x))}</div>
+      <div class="btn-row" style="margin-top:6px;">
+        <button class="btn-primary" onclick="openFundingPaySheet('${x.id}')">💵 تسديد</button>
+        <button class="btn-secondary" onclick="openFundingSheet('${x.id}')">✏️ تعديل</button>
+      </div>
     </div>`).join('');
 }
 function renderWalletBalance(){
