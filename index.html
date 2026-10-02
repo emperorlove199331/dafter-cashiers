@@ -458,6 +458,8 @@
     <div id="reportSummary"></div>
     <button class="btn-secondary" style="margin-bottom:14px;" onclick="printMonthlyReport()">🖨️ طباعة التقرير / حفظ PDF</button>
     <div id="reportTable"></div>
+    <h2 class="section-title" style="font-size:14px;margin-top:18px;">عمليات الشهر (اضغط على أي عملية لتفاصيلها)</h2>
+    <div id="reportOps"></div>
     <div id="backupReminderBox"></div>
     <h2 class="section-title">سجل النشاط (آخر العمليات المسجّلة)</h2>
     <div id="activityLog"></div>
@@ -752,6 +754,15 @@
 </div>
 
 <!-- Transaction Detail Sheet -->
+<div class="overlay" id="logDetailOverlay">
+  <div class="sheet">
+    <h3>تفاصيل الحركة</h3>
+    <div id="logDetailBody" style="margin-bottom:8px;"></div>
+    <button class="btn-primary" id="logDetailOpenBtn" style="display:none;"></button>
+    <button class="btn-secondary" onclick="closeSheet('logDetailOverlay')">إغلاق</button>
+  </div>
+</div>
+
 <div class="overlay" id="txnDetailOverlay">
   <div class="sheet">
     <h3>تفاصيل العملية</h3>
@@ -1310,9 +1321,11 @@ function runGenericConfirm(){
   if(cb) cb();
 }
 
-function logActivity(action, detail){
+function logActivity(action, detail, ref){
   if(!data.log) data.log = [];
-  data.log.push({ id: uid(), ts: new Date().toISOString(), action, detail: detail||'' });
+  const entry = { id: uid(), ts: new Date().toISOString(), action, detail: detail||'' };
+  if(ref) entry.ref = ref;   // ربط الحركة بالسجل الأصلي حتى تنفتح تفاصيله بالضغط عليها
+  data.log.push(entry);
   if(data.log.length > 300) data.log = data.log.slice(-300);
 }
 function formatLogTime(iso){
@@ -1660,6 +1673,7 @@ function renderReport(){
     </div>`;
 
   rows = rows.sort((a,b)=> b.charged - a.charged);
+  renderReportOps(monthStr);
 
   const el = document.getElementById('reportTable');
   if(rows.length===0){
@@ -1681,6 +1695,53 @@ function renderReport(){
       </div>
       <div class="amount mono pending">-${fmt(playerPayouts)}</div>
     </div>` : '');
+}
+
+// كل عمليات الشهر (شحن، تمرير ربح كاشير، ربح لاعب غير مسجّل) — الضغط على أي وحدة بيفتح تفاصيلها
+function renderReportOps(monthStr){
+  const el = document.getElementById('reportOps');
+  if(!el) return;
+  const items = [];
+  data.transactions.forEach(t=>{
+    if(t.date && t.date.startsWith(monthStr)) items.push({ key:(t.date||'')+' '+(t.time||''), html: txnRowHTML(t, true) });
+  });
+  (data.platformPayins||[]).forEach(pp=>{
+    if(pp.smartId || !pp.date || !pp.date.startsWith(monthStr)) return;
+    items.push({ key:(pp.date||'')+' '+(pp.time||''), html: `
+    <div class="row" onclick="openPlatformPayinSheet('${pp.id}')" style="cursor:pointer;">
+      <div class="main">
+        <p class="name">ربح لاعب غير مسجّل</p>
+        <p class="sub"><span class="badge method">${WALLET_LABELS[pp.destination]||''}</span><span>${fmtDT(pp)}</span>${pp.note ? ' · '+escapeHTML(pp.note) : ''}</p>
+      </div>
+      <div class="amount mono">- ${fmt(pp.amount)}</div>
+    </div>` });
+  });
+  const inMonth = d => d && d.startsWith(monthStr);
+  const wrow = (key, title, sub, amt, fn) => items.push({ key, html: `
+    <div class="row" onclick="${fn}" style="cursor:pointer;">
+      <div class="main"><p class="name">${title}</p><p class="sub">${sub}</p></div>
+      <div class="amount mono">${amt}</div>
+    </div>` });
+  (data.walletTransfers||[]).forEach(x=>{
+    if(!inMonth(x.date)) return;
+    const dir = (x.from && x.to) ? `${WALLET_LABELS[x.from]} ← ${WALLET_LABELS[x.to]}` : 'تحويل';
+    wrow((x.date||'')+' '+(x.time||''), 'تحويل بين المحافظ', `${dir} · <span>${fmtDT(x)}</span>${x.note ? ' · '+escapeHTML(x.note) : ''}`, fmt(transferSent(x)), `openTransferSheet('${x.id}')`);
+  });
+  (data.walletFunding||[]).forEach(x=>{
+    if(!inMonth(x.date)) return;
+    wrow((x.date||'')+' '+(x.time||''), 'تمويل ← ' + (WALLET_LABELS[x.destination]||''), `<span>${fmtDT(x)}</span>${x.note ? ' · '+escapeHTML(x.note) : ''}`, fmt(x.amount), `openFundingSheet('${x.id}')`);
+  });
+  (data.externalWithdrawals||[]).forEach(x=>{
+    if(!inMonth(x.date)) return;
+    wrow((x.date||'')+' '+(x.time||''), 'سحب رصيد خارجي', `من ${WALLET_LABELS[x.source]||''} · <span>${fmtDT(x)}</span>${x.note ? ' · '+escapeHTML(x.note) : ''}`, '- ' + fmt(x.amount), `openWithdrawSheet('${x.id}')`);
+  });
+  (data.reconciliations||[]).forEach(x=>{
+    if(!inMonth(x.date)) return;
+    wrow((x.date||'')+' '+(x.time||'00:00'), 'تسوية رصيد', escapeHTML(x.date||''), '', `openReconcileSheet('${x.id}')`);
+  });
+  if(items.length===0){ el.innerHTML = '<div class="empty">ما في عمليات بهالشهر.</div>'; return; }
+  items.sort((a,b)=> b.key.localeCompare(a.key));
+  el.innerHTML = items.map(i=>i.html).join('');
 }
 
 function renderMonthLockBox(monthStr){
@@ -1846,16 +1907,67 @@ function renderBackupReminder(){
 
 document.getElementById('reportMonth').addEventListener('change', renderReport);
 
+function openLogDetail(id){
+  const e = (data.log||[]).find(x=>x.id===id);
+  if(!e) return;
+  const ref = e.ref;
+  let rows = [['الحركة', e.action], ['الوقت', formatLogTime(e.ts)], ['التفاصيل', e.detail || '—']];
+  let openFn = null, openLabel = '', extra = '';
+  const find = (arr, rid) => (arr||[]).find(x=>x.id===rid);
+  if(ref){
+    if(ref.k==='txn'){
+      const r = find(data.transactions, ref.id);
+      if(r){ openFn = `openTxnDetail('${r.id}')`; openLabel = 'فتح العملية وتعديلها'; } else rows.push(['الحالة','هذه العملية انحذفت']);
+    } else if(ref.k==='transfer'){
+      const r = find(data.walletTransfers, ref.id);
+      if(r){ openFn = `openTransferSheet('${r.id}')`; openLabel = 'فتح التحويل وتعديله'; } else rows.push(['الحالة','هذا التحويل انحذف']);
+    } else if(ref.k==='funding'){
+      const r = find(data.walletFunding, ref.id);
+      if(r){ openFn = `openFundingSheet('${r.id}')`; openLabel = 'فتح التمويل وتعديله'; } else rows.push(['الحالة','هذا التمويل انحذف']);
+    } else if(ref.k==='payin'){
+      const r = find(data.platformPayins, ref.id);
+      if(r && !r.smartId){ openFn = `openPlatformPayinSheet('${r.id}')`; openLabel = 'فتح الدفعة وتعديلها'; } else rows.push(['الحالة','هذه الدفعة انحذفت']);
+    } else if(ref.k==='withdraw'){
+      const r = find(data.externalWithdrawals, ref.id);
+      if(r){ openFn = `openWithdrawSheet('${r.id}')`; openLabel = 'فتح السحب وتعديله'; } else rows.push(['الحالة','هذا السحب انحذف']);
+    } else if(ref.k==='reconcile'){
+      const r = find(data.reconciliations, ref.id);
+      if(r){ openFn = `openReconcileSheet('${r.id}')`; openLabel = 'فتح التسوية وتعديلها'; } else rows.push(['الحالة','هذه التسوية انحذفت']);
+    } else if(ref.k==='settleAcc'){
+      extra = '<p class="sub" style="margin:10px 0 6px;">العمليات يلي انسدّدت (اضغط على أي وحدة لتفاصيلها وتعديلها):</p>' +
+        (ref.items||[]).map(it=>{
+          const t = find(data.transactions, it.id);
+          if(!t) return `<div class="row"><div class="main"><p class="sub">عملية محذوفة</p></div><div class="amount mono">${fmt(it.applied)}</div></div>`;
+          return `<div class="row" style="cursor:pointer;" onclick="closeSheet('logDetailOverlay'); openTxnDetail('${t.id}')">
+            <div class="main"><p class="name">${escapeHTML(cashierName(t.cashierId))} — شحنة ${fmt(t.amount)}</p><p class="sub">${fmtDT(t)} · ${chargeStatusLabel(t)}</p></div>
+            <div class="amount mono in">${fmt(it.applied)}</div></div>`;
+        }).join('');
+    }
+  } else if(/^(تعديل|تحويل|تمويل|سحب|دفعة|شحن|تمرير|تسديد|تسوية)/.test(e.action)){
+    rows.push(['ملاحظة','هذه الحركة مسجّلة قبل إضافة الربط، فما بتنفتح مباشرة — دوّر عليها بقسم "عمليات الشهر" أو بالمحفظة.']);
+  }
+  document.getElementById('logDetailBody').innerHTML = rows.map(([k,v])=>`
+    <div class="row" style="cursor:default;">
+      <div class="main"><p class="sub" style="margin:0;">${escapeHTML(k)}</p></div>
+      <div class="amount" style="font-size:14px;font-weight:500;">${escapeHTML(String(v))}</div>
+    </div>`).join('') + extra;
+  const btn = document.getElementById('logDetailOpenBtn');
+  if(openFn){
+    btn.style.display = 'block'; btn.textContent = openLabel;
+    btn.onclick = function(){ closeSheet('logDetailOverlay'); eval(openFn); };
+  } else { btn.style.display = 'none'; btn.onclick = null; }
+  document.getElementById('logDetailOverlay').classList.add('show');
+}
 function renderActivityLog(){
   const el = document.getElementById('activityLog');
   if(!el) return;
-  const log = (data.log||[]).slice(-20).reverse();
+  const log = (data.log||[]).slice(-50).reverse();
   if(log.length===0){
     el.innerHTML = '<div class="empty">ما في نشاط مسجّل بعد.</div>';
     return;
   }
   el.innerHTML = log.map(entry=>`
-    <div class="row" style="cursor:default;">
+    <div class="row" style="cursor:pointer;" onclick="openLogDetail('${entry.id}')">
       <div class="main">
         <p class="name" style="font-size:13.5px;">${escapeHTML(entry.action)}</p>
         <p class="sub">${escapeHTML(entry.detail||'')}</p>
@@ -2233,12 +2345,13 @@ function saveWalletTransfer(){
     if(x){
       x.from = transferFrom; x.to = transferTo; x.sentAmount = sentAmount; x.receivedAmount = receivedAmount;
       x.date = date; x.note = note; delete x.amount; delete x.direction;
-      logActivity('تعديل تحويل محفظة', `${dirLabel} — حوّل ${fmt(sentAmount)}، وصل ${fmt(receivedAmount)}${fee?' (عمولة '+fmt(fee)+')':''}`);
+      logActivity('تعديل تحويل محفظة', `${dirLabel} — حوّل ${fmt(sentAmount)}، وصل ${fmt(receivedAmount)}${fee?' (عمولة '+fmt(fee)+')':''}`, {k:'transfer', id:x.id});
     }
     editingTransferId = null;
   } else {
-    data.walletTransfers.push({ id: uid(), from: transferFrom, to: transferTo, sentAmount, receivedAmount, date, time: nowTime(), note });
-    logActivity('تحويل بين المحافظ', `${dirLabel} — حوّل ${fmt(sentAmount)}، وصل ${fmt(receivedAmount)}${fee?' (عمولة '+fmt(fee)+')':''}`);
+    const newT = { id: uid(), from: transferFrom, to: transferTo, sentAmount, receivedAmount, date, time: nowTime(), note };
+    data.walletTransfers.push(newT);
+    logActivity('تحويل بين المحافظ', `${dirLabel} — حوّل ${fmt(sentAmount)}، وصل ${fmt(receivedAmount)}${fee?' (عمولة '+fmt(fee)+')':''}`, {k:'transfer', id:newT.id});
   }
   saveData();
   closeSheet('walletTransferOverlay');
@@ -2363,7 +2476,7 @@ function saveFunding(){
       if(before.amount!==f.amount) changes.push(`المبلغ: ${fmt(before.amount)} ⬅ ${fmt(f.amount)} ل.س`);
       if(before.destination!==f.destination) changes.push(`الوجهة: ${WALLET_LABELS[before.destination]} ⬅ ${WALLET_LABELS[f.destination]}`);
       if(before.date!==f.date) changes.push(`التاريخ: ${before.date} ⬅ ${f.date}`);
-      logActivity('تعديل دفعة تمويل', changes.length ? changes.join(' | ') : 'لا تغييرات فعلية');
+      logActivity('تعديل دفعة تمويل', changes.length ? changes.join(' | ') : 'لا تغييرات فعلية', {k:'funding', id:f.id});
     }
     editingFundingId = null;
     saveData();
@@ -2375,7 +2488,7 @@ function saveFunding(){
   const newF = { id: uid(), amount, destination: fundingDestination, date, time: nowTime(), note };
   if(paySrc){ newF.paySource = paySrc; newF.paidAmount = paidAmount; newF.fee = fee; newF.payments = payments; }
   data.walletFunding.push(newF);
-  logActivity('تمويل من المموّل الرئيسي', `${WALLET_LABELS[fundingDestination]} — ${fmt(amount)} ل.س`);
+  logActivity('تمويل من المموّل الرئيسي', `${WALLET_LABELS[fundingDestination]} — ${fmt(amount)} ل.س`, {k:'funding', id:newF.id});
   saveData();
   closeSheet('fundingOverlay');
   renderAll();
@@ -2426,7 +2539,7 @@ function saveFundingPay(){
   if(date > todayISO()){ showToast('التاريخ ما لازم يكون بالمستقبل'); return; }
   if(!Array.isArray(f.payments)) f.payments = fundingPaymentsOf(f).map(pm=>({ id: uid(), ...pm, date: f.date }));
   f.payments.push({ id: uid(), amount, method: fundingPayMethod, date, time: nowTime() });
-  logActivity('تسديد شحن منصة', `${fmt(amount)} ل.س من ${fundingPayMethod==='cash'?'الكاش':'شام كاش'} — الباقي ${fmt(fundingOwed(f))}`);
+  logActivity('تسديد شحن منصة', `${fmt(amount)} ل.س من ${fundingPayMethod==='cash'?'الكاش':'شام كاش'} — الباقي ${fmt(fundingOwed(f))}`, {k:'funding', id:f.id});
   saveData();
   renderAll();
   if(fundingOwed(f) > 0){ renderFundingPaySheet(); }
@@ -2512,7 +2625,7 @@ function savePlatformPayin(){
       if(before.amount!==p.amount) changes.push(`المبلغ: ${fmt(before.amount)} ⬅ ${fmt(p.amount)} ل.س`);
       if(before.destination!==p.destination) changes.push(`الوجهة: ${WALLET_LABELS[before.destination]} ⬅ ${WALLET_LABELS[p.destination]}`);
       if(before.date!==p.date) changes.push(`التاريخ: ${before.date} ⬅ ${p.date}`);
-      logActivity('تعديل دفعة من المنصة', changes.length ? changes.join(' | ') : 'لا تغييرات فعلية');
+      logActivity('تعديل دفعة من المنصة', changes.length ? changes.join(' | ') : 'لا تغييرات فعلية', {k:'payin', id:p.id});
     }
     editingPlatformPayinId = null;
     saveData();
@@ -2521,8 +2634,9 @@ function savePlatformPayin(){
     showToast('تم تعديل الدفعة');
     return;
   }
-  data.platformPayins.push({ id: uid(), amount, destination: platformPayinDestination, date, time: nowTime(), note });
-  logActivity('دفعة من المنصة', `${WALLET_LABELS[platformPayinDestination]} — ${fmt(amount)} ل.س`);
+  const newP = { id: uid(), amount, destination: platformPayinDestination, date, time: nowTime(), note };
+  data.platformPayins.push(newP);
+  logActivity('دفعة من المنصة', `${WALLET_LABELS[platformPayinDestination]} — ${fmt(amount)} ل.س`, {k:'payin', id:newP.id});
   saveData();
   closeSheet('platformPayinOverlay');
   renderAll();
@@ -2578,7 +2692,7 @@ function saveWithdraw(){
       if(before.amount!==w.amount) changes.push(`المبلغ: ${fmt(before.amount)} ⬅ ${fmt(w.amount)} ل.س`);
       if(before.source!==w.source) changes.push(`المصدر: ${WALLET_LABELS[before.source]} ⬅ ${WALLET_LABELS[w.source]}`);
       if(before.date!==w.date) changes.push(`التاريخ: ${before.date} ⬅ ${w.date}`);
-      logActivity('تعديل سحب خارجي', changes.length ? changes.join(' | ') : 'لا تغييرات فعلية');
+      logActivity('تعديل سحب خارجي', changes.length ? changes.join(' | ') : 'لا تغييرات فعلية', {k:'withdraw', id:w.id});
     }
     editingWithdrawId = null;
     saveData();
@@ -2587,8 +2701,9 @@ function saveWithdraw(){
     showToast('تم تعديل السحب');
     return;
   }
-  data.externalWithdrawals.push({ id: uid(), amount, source: withdrawSource, date, time: nowTime(), note });
-  logActivity('سحب رصيد خارجي', `من ${WALLET_LABELS[withdrawSource]} — ${fmt(amount)} ل.س`);
+  const newW = { id: uid(), amount, source: withdrawSource, date, time: nowTime(), note };
+  data.externalWithdrawals.push(newW);
+  logActivity('سحب رصيد خارجي', `من ${WALLET_LABELS[withdrawSource]} — ${fmt(amount)} ل.س`, {k:'withdraw', id:newW.id});
   saveData();
   closeSheet('withdrawOverlay');
   renderAll();
@@ -2674,10 +2789,10 @@ function saveReconcile(){
   if(editingReconcileId){
     const idx = data.reconciliations.findIndex(x=>x.id===editingReconcileId);
     if(idx>-1) data.reconciliations[idx] = rec;
-    logActivity('تعديل تسوية رصيد', `${date} — ${diffDetail}`);
+    logActivity('تعديل تسوية رصيد', `${date} — ${diffDetail}`, {k:'reconcile', id:rec.id});
   } else {
     data.reconciliations.push(rec);
-    logActivity('تسوية رصيد', `${date} — ${diffDetail}`);
+    logActivity('تسوية رصيد', `${date} — ${diffDetail}`, {k:'reconcile', id:rec.id});
   }
   editingReconcileId = null;
   saveData();
@@ -3046,7 +3161,7 @@ function saveTxn(){
         delete t.settledTime;
       }
       const changes = diffTxnFields(before, t);
-      logActivity('تعديل عملية', changes.length ? changes.join(' | ') : `${cashierName(cashierId)} — لا تغييرات فعلية`);
+      logActivity('تعديل عملية', changes.length ? changes.join(' | ') : `${cashierName(cashierId)} — لا تغييرات فعلية`, {k:'txn', id:t.id});
     }
     editingTxnId = null;
     saveData();
@@ -3076,7 +3191,8 @@ function saveTxn(){
   data.transactions.push(t);
   logActivity(
     txnType==='charge' ? 'شحن كاشير' : (t.smartId ? 'تمرير ربح مع تسديد دين' : 'تمرير ربح'),
-    `${cashierName(cashierId)} — ${fmt(amount)} ل.س` + (t.smartId ? ` (سُدِّد دين ${fmt(t.offset)})` : '')
+    `${cashierName(cashierId)} — ${fmt(amount)} ل.س` + (t.smartId ? ` (سُدِّد دين ${fmt(t.offset)})` : ''),
+    {k:'txn', id:t.id}
   );
   saveData();
   closeSheet('txnOverlay');
@@ -3167,7 +3283,8 @@ function confirmSettle(){
   t.status = isFullyPaid ? 'paid' : 'partial';
   logActivity(
     isFullyPaid ? 'تسديد دفعة معلّقة' : 'تسديد جزئي',
-    `${cashierName(t.cashierId)} — ${fmt(entered)} ل.س${isFullyPaid ? '' : ' (متبقي ' + fmt(t.amount - collected) + ' ل.س)'}`
+    `${cashierName(t.cashierId)} — ${fmt(entered)} ل.س${isFullyPaid ? '' : ' (متبقي ' + fmt(t.amount - collected) + ' ل.س)'}`,
+    {k:'txn', id:t.id}
   );
   saveData();
   closeSheet('settleOverlay');
@@ -3222,6 +3339,7 @@ function confirmSettleAccount(){
   const debts = sortedDebtsOf(cashierId);
   if(debts.length===0){ showToast('ما في ديون معلّقة لهذا الكاشير'); return; }
   let left = amount, fullyPaidCount = 0, touchedPartial = false, totalApplied = 0;
+  const appliedList = [];
   for(const t of debts){
     if(left<=0) break;
     const remaining = remainingOf(t);
@@ -3229,6 +3347,7 @@ function confirmSettleAccount(){
     if(applied<=0) continue;
     if(!Array.isArray(t.payments)) t.payments = [];
     t.payments.push({ amount: applied, method: settleAccountMethod, date: todayISO(), time: nowTime() });
+    appliedList.push({ id: t.id, applied });
     t.method = settleAccountMethod;
     t.settledDate = todayISO();
     t.settledTime = nowTime();
@@ -3242,7 +3361,8 @@ function confirmSettleAccount(){
   if(totalApplied<=0){ showToast('ما في شي تم تطبيقه'); return; }
   logActivity(
     'تسديد حساب جماعي',
-    `${cashierName(cashierId)} — ${fmt(totalApplied)} ل.س على ${fullyPaidCount + (touchedPartial?1:0)} عملية${left>0 ? ' — فاضل ' + fmt(left) + ' ل.س بدون ديون معلّقة' : ''}`
+    `${cashierName(cashierId)} — ${fmt(totalApplied)} ل.س على ${fullyPaidCount + (touchedPartial?1:0)} عملية${left>0 ? ' — فاضل ' + fmt(left) + ' ل.س بدون ديون معلّقة' : ''}`,
+    {k:'settleAcc', cashierId, method: settleAccountMethod, items: appliedList}
   );
   saveData();
   closeSheet('settleAccountOverlay');
