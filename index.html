@@ -495,6 +495,18 @@
       <button class="btn-secondary" style="margin-top:8px;" onclick="document.getElementById('importFile').click()">استيراد نسخة</button>
       <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importBackup(event)">
     </div>
+    <div class="settings-item" style="margin-top:10px;">
+      <label class="confirm-check" style="background:var(--paper-raised); color:var(--ink); border:1px solid var(--line);">
+        <input type="checkbox" id="autoBackupCheck" onchange="onAutoBackupToggle()">
+        <span>📥 نسخة احتياطية تلقائية يومياً</span>
+      </label>
+      <div class="field" style="margin-top:8px;">
+        <label>وقت النسخة</label>
+        <input type="time" id="autoBackupTime" value="12:00" onchange="onAutoBackupToggle()">
+      </div>
+      <p id="autoBackupStatus" style="font-size:12.5px;color:var(--ink-soft);margin:6px 0 0;"></p>
+      <p style="font-size:12.5px;color:var(--ink-soft);margin:6px 0 0;">⚠️ بتشتغل وقت يكون التطبيق مفتوح (حتى بالخلفية). إذا كان مسكّر وقت الموعد، بتنأخذ أول ما تفتحه بعد الموعد. النسخ التلقائية غير مشفّرة، واسم الملف: يوم-شهر_ساعة (مثال 03-10_12h).</p>
+    </div>
     <h2 class="section-title">قفل التطبيق</h2>
     <div class="settings-item" id="pinSettingsBox"></div>
     <div class="settings-item" id="biometricSettingsBox"></div>
@@ -784,6 +796,15 @@
 </div>
 
 <!-- Transaction Detail Sheet -->
+<div class="overlay" id="feeReportOverlay">
+  <div class="sheet">
+    <h3>تقرير العمولة — من وين إجت</h3>
+    <div class="field" style="margin-bottom:8px;"><select id="feeReportMonth" onchange="renderFeeReport()"></select></div>
+    <div id="feeReportBody" style="max-height:58vh;overflow-y:auto;margin-bottom:10px;"></div>
+    <button class="btn-secondary" onclick="closeSheet('feeReportOverlay')">إغلاق</button>
+  </div>
+</div>
+
 <div class="overlay" id="logDetailOverlay">
   <div class="sheet">
     <h3>تفاصيل الحركة</h3>
@@ -1220,6 +1241,9 @@ async function onLoggedIn(user){
   const hasPinLock = !!localStorage.getItem(PIN_STORAGE_KEY);
   if(hasPinLock){ document.getElementById('pinLockOverlay').classList.add('show'); }
   renderAll();
+  renderAutoBackupUI();
+  dataReadyForBackup = true;
+  setTimeout(autoBackupTick, 2000);
   if(hasPinLock){ await checkPinLockOnBoot(); }
 }
 
@@ -2222,6 +2246,52 @@ function getWalletTotals(){
   return { cashBalance, shamBalance, platformBalance };
 }
 // إجمالي عمولة التحويلات (المبلغ يلي حوّلته ناقص يلي وصل فعليًا) عبر كل سجلات التحويل — رقم منفصل وواضح، مش مدمج بصمت جوا مجموع المحافظ
+// تقرير العمولة: كل تحويل أو شحن منصة فيه عمولة، مع إمكانية الفلترة بالشهر والضغط لفتح السجل
+function openFeeReport(){
+  const set = new Set();
+  (data.walletTransfers||[]).forEach(x=>{ if(transferFee(x)>0 && x.date) set.add(x.date.slice(0,7)); });
+  (data.walletFunding||[]).forEach(x=>{ if(x.fee>0 && x.date) set.add(x.date.slice(0,7)); });
+  const months = Array.from(set).sort().reverse();
+  const sel = document.getElementById('feeReportMonth');
+  sel.innerHTML = '<option value="all">كل الأشهر</option>' + months.map(m=>{ const [y,mo]=m.split('-'); return `<option value="${m}">${mo}/${y}</option>`; }).join('');
+  sel.value = 'all';
+  renderFeeReport();
+  document.getElementById('feeReportOverlay').classList.add('show');
+}
+function renderFeeReport(){
+  const m = document.getElementById('feeReportMonth').value;
+  const ok = d => m==='all' || (d && d.startsWith(m));
+  const tr = (data.walletTransfers||[]).filter(x=>transferFee(x)>0 && ok(x.date)).sort((a,b)=>sortKey(b).localeCompare(sortKey(a)));
+  const fu = (data.walletFunding||[]).filter(x=>x.fee>0 && ok(x.date)).sort((a,b)=>sortKey(b).localeCompare(sortKey(a)));
+  const trSum = tr.reduce((s,x)=>s+transferFee(x),0), fuSum = fu.reduce((s,x)=>s+x.fee,0);
+  const box = document.getElementById('feeReportBody');
+  const srcLabel = x => x.paySource==='cash' ? 'من الكاش' : x.paySource==='shamcash' ? 'من شام كاش' : x.paySource==='pending' ? 'معلّق' : '';
+  const sum = (k,v) => `<div style="display:flex;justify-content:space-between;font-size:14px;padding:6px 0;border-bottom:1px solid var(--line);"><span>${k}</span><span class="mono">${fmt(v)}</span></div>`;
+  let html = `<div class="stat" style="background:var(--rust-soft);padding:12px;margin-bottom:10px;">
+      ${sum('عمولة التحويلات بين المحافظ (' + tr.length + ')', trSum)}
+      ${sum('عمولة شحن المنصة (' + fu.length + ')', fuSum)}
+      <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:600;padding-top:8px;"><span>المجموع</span><span class="mono">${fmt(trSum+fuSum)}</span></div>
+    </div>`;
+  if(fu.length){
+    html += '<p class="sub" style="margin:8px 0 4px;">شحن المنصة (اضغط للتعديل):</p>' + fu.map(x=>`
+      <div class="row" style="cursor:pointer;" onclick="closeSheet('feeReportOverlay'); openFundingSheet('${x.id}')">
+        <div class="main"><p class="name">شحن المنصة — مدفوع ${fmt(x.paidAmount)} · واصل ${fmt(x.amount)}</p>
+        <p class="sub"><span>${fmtDT(x)}</span> ${srcLabel(x) ? '· '+srcLabel(x) : ''}${fundingOwed(x)>0 ? ' · باقي '+fmt(fundingOwed(x))+' معلّق' : ''}${x.note ? ' · '+escapeHTML(x.note) : ''}</p></div>
+        <div class="amount mono pending">${fmt(x.fee)}</div>
+      </div>`).join('');
+  }
+  if(tr.length){
+    html += '<p class="sub" style="margin:8px 0 4px;">التحويلات بين المحافظ (اضغط للتعديل):</p>' + tr.map(x=>{
+      const ft = transferFromTo(x);
+      return `<div class="row" style="cursor:pointer;" onclick="closeSheet('feeReportOverlay'); openTransferSheet('${x.id}')">
+        <div class="main"><p class="name">${WALLET_LABELS[ft.from]} ← ${WALLET_LABELS[ft.to]} — حوّل ${fmt(transferSent(x))} · وصل ${fmt(transferReceived(x))}</p>
+        <p class="sub"><span>${fmtDT(x)}</span>${x.note ? ' · '+escapeHTML(x.note) : ''}</p></div>
+        <div class="amount mono pending">${fmt(transferFee(x))}</div>
+      </div>`; }).join('');
+  }
+  if(!fu.length && !tr.length) html += '<div class="empty">ما في عمولات بهالفترة.</div>';
+  box.innerHTML = html;
+}
 function getTotalTransferFee(){
   return (data.walletTransfers||[]).reduce((s,x)=> s + transferFee(x), 0);
 }
@@ -2303,7 +2373,9 @@ function renderWalletBalance(){
   const totalBeforeCommission = cashBalance + shamBalance + platformBalance + rawFee;
   // رأس المال = كل الديون المعلّقة (على كل الكاشيرات، كل الوقت) + أرصدة المحافظ الفعلية الثلاثة.
   const totalPendingAll = data.transactions.filter(t=>t.type==='charge').reduce((s,t)=>s+remainingOf(t),0);
-  const totalCapital = totalPendingAll + platformBalance + cashBalance + shamBalance - fundingOwedTotal;
+  const totalCapitalNet = totalPendingAll + platformBalance + cashBalance + shamBalance - fundingOwedTotal;
+  // مجموع رأس المال مع العمولة = رأس المال الفعلي + كل العمولات يلي انخصمت (تحويلات + شحن المنصة)
+  const totalCapital = totalCapitalNet + totalTransferFee;
   el.innerHTML = `
     <div class="stat-row" style="margin-bottom:10px;">
       <div class="stat" style="background:var(--green-soft);">
@@ -2328,15 +2400,16 @@ function renderWalletBalance(){
       </div>
     </div>
     <div class="stat-row" style="margin-bottom:10px;">
-      <div class="stat" style="background:var(--rust-soft);">
-        <p class="k" style="color:var(--rust);">📉 عمولة التحويل وشحن المنصة (تراكمية)</p>
+      <div class="stat" style="background:var(--rust-soft); cursor:pointer;" onclick="openFeeReport()">
+        <p class="k" style="color:var(--rust);">📉 عمولة التحويل وشحن المنصة (تراكمية) — اضغط للتقرير</p>
         <p class="v mono" style="color:var(--rust);">${fmt(totalTransferFee)}</p>
       </div>
     </div>
     <div class="stat-row">
       <div class="stat" style="background:var(--green-soft);">
-        <p class="k" style="color:var(--green);">🏛️ مجموع رأس المال</p>
+        <p class="k" style="color:var(--green);">🏛️ مجموع رأس المال (مع العمولة)</p>
         <p class="v mono" style="color:var(--green);">${fmt(totalCapital)}</p>
+        <p class="sub" style="margin:4px 0 0;font-size:12px;">بدون العمولة: <span class="mono">${fmt(totalCapitalNet)}</span></p>
       </div>
     </div>`;
 }
@@ -3890,6 +3963,86 @@ async function checkPinLockOnBoot(){
     if(inp) inp.focus();
   }, 150);
 }
+
+// ---------- نسخة احتياطية تلقائية يومية ----------
+// ملاحظة تقنية: المتصفح ما بيسمح لصفحة ويب تشتغل وهي مسكّرة، فالنسخة بتنأخذ لما التطبيق يكون مفتوح بعد الموعد
+const AUTO_BACKUP_KEY = 'autoBackupSettings';
+let dataReadyForBackup = false;
+function getAutoBackupSettings(){
+  try{ return Object.assign({ enabled:false, time:'12:00', lastKey:'' }, JSON.parse(localStorage.getItem(AUTO_BACKUP_KEY)||'{}')); }
+  catch(e){ return { enabled:false, time:'12:00', lastKey:'' }; }
+}
+function saveAutoBackupSettings(st){ localStorage.setItem(AUTO_BACKUP_KEY, JSON.stringify(st)); }
+function autoBackupFileName(d){
+  const pad = n => String(n).padStart(2,'0');
+  return `${pad(d.getDate())}-${pad(d.getMonth()+1)}_${pad(d.getHours())}h.json`;
+}
+function renderAutoBackupUI(){
+  const st = getAutoBackupSettings();
+  const chk = document.getElementById('autoBackupCheck');
+  if(!chk) return;
+  chk.checked = st.enabled;
+  document.getElementById('autoBackupTime').value = st.time;
+  const stat = document.getElementById('autoBackupStatus');
+  let txt = st.enabled ? `مفعّلة — كل يوم الساعة ${st.time}.` : 'غير مفعّلة.';
+  if(st.lastRun) txt += ` آخر نسخة تلقائية: ${st.lastRun}`;
+  if(st.enabled && 'Notification' in window && Notification.permission==='denied') txt += ' (الإشعارات محظورة من إعدادات المتصفح)';
+  stat.textContent = txt;
+}
+async function onAutoBackupToggle(){
+  const st = getAutoBackupSettings();
+  st.enabled = document.getElementById('autoBackupCheck').checked;
+  st.time = document.getElementById('autoBackupTime').value || '12:00';
+  saveAutoBackupSettings(st);
+  if(st.enabled && 'Notification' in window && Notification.permission==='default'){
+    try{ await Notification.requestPermission(); }catch(e){}
+  }
+  renderAutoBackupUI();
+  autoBackupTick();
+}
+async function notifyBackupDone(fileName){
+  const title = 'تمت النسخة الاحتياطية ✅';
+  const body = 'دفتر الكاشيرات — ' + fileName;
+  try{
+    if('Notification' in window && Notification.permission==='granted'){
+      const reg = ('serviceWorker' in navigator) ? await navigator.serviceWorker.getRegistration() : null;
+      if(reg && reg.showNotification) await reg.showNotification(title, { body, icon:'icons/icon-192.png', tag:'auto-backup' });
+      else new Notification(title, { body, icon:'icons/icon-192.png' });
+    }
+  }catch(e){}
+}
+function runAutoBackup(){
+  const now = new Date();
+  const fileName = autoBackupFileName(now);
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type:'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = fileName;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 5000);
+  const st = getAutoBackupSettings();
+  st.lastKey = todayISO();
+  st.lastRun = fileName;
+  saveAutoBackupSettings(st);
+  logActivity('نسخة احتياطية تلقائية', fileName);
+  data.lastBackupAt = now.toISOString();
+  saveData();
+  renderBackupReminder();
+  renderAutoBackupUI();
+  showToast('تمت النسخة الاحتياطية: ' + fileName);
+  notifyBackupDone(fileName);
+}
+function autoBackupTick(){
+  if(!dataReadyForBackup || !currentUser) return;
+  const st = getAutoBackupSettings();
+  if(!st.enabled) return;
+  const now = new Date();
+  const [hh, mm] = (st.time || '12:00').split(':').map(Number);
+  const due = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hh||0, mm||0, 0);
+  if(now >= due && st.lastKey !== todayISO()) runAutoBackup();
+}
+setInterval(autoBackupTick, 30000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) autoBackupTick(); });
 
 // ---------- Encryption helpers (Web Crypto AES-GCM) ----------
 async function deriveKey(password, saltBytes){
