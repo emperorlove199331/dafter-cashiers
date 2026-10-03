@@ -544,6 +544,21 @@
     <div id="filterList"></div>
   </section>
 
+  <section id="view-audit">
+    <h2 class="section-title">جرد الفترة</h2>
+    <p style="font-size:13px;color:var(--ink-soft);margin-top:-8px;">اختر من يوم إلى يوم: بيعرض لك أرصدة المحافظ بالبداية والنهاية، وكل ما دخل وطلع، وشحن وتسديد الكاشيرات والأرباح.</p>
+    <div class="btn-row" style="margin-bottom:10px;">
+      <div class="field" style="flex:1;margin:0;"><label>من تاريخ</label><input type="date" id="auditFrom" onchange="renderAudit()"></div>
+      <div class="field" style="flex:1;margin:0;"><label>إلى تاريخ</label><input type="date" id="auditTo" onchange="renderAudit()"></div>
+    </div>
+    <div class="btn-row" style="margin-bottom:14px;">
+      <button class="btn-secondary" onclick="setAuditRange('today')">اليوم</button>
+      <button class="btn-secondary" onclick="setAuditRange('month')">هالشهر</button>
+      <button class="btn-secondary" onclick="setAuditRange('lastmonth')">الشهر الماضي</button>
+    </div>
+    <div id="auditResult"></div>
+  </section>
+
   <section id="view-wallet">
     <h2 class="section-title">أرصدة المحفظة</h2>
     <div id="walletBalanceBox" style="margin-bottom:20px;"></div>
@@ -600,6 +615,7 @@
   <button data-view="report" onclick="switchView('report')"><span class="ic">📊</span>التقرير</button>
   <button data-view="filter" onclick="switchView('filter')"><span class="ic">🔍</span>فلترة</button>
   <button data-view="wallet" onclick="switchView('wallet')"><span class="ic">💼</span>المحفظة</button>
+  <button data-view="audit" onclick="switchView('audit')"><span class="ic">📋</span>جرد</button>
 </nav>
 
 <!-- Add Transaction Sheet -->
@@ -2900,11 +2916,137 @@ function renderAll(){
 }
 
 // ---------- View switching ----------
+// ---------- جرد الفترة ----------
+// كل حركة مالية على المحافظ كسجل واحد: {w: المحفظة, amt: موجب/سالب, label, date}
+// نفس منطق getWalletTotals بالضبط، بس مقسّم بالتاريخ حتى نقدر نحسب أرصدة أي يوم وحركة أي فترة
+function walletEvents(){
+  const ev = [];
+  const add = (w, amt, label, date) => { if(amt) ev.push({ w, amt, label, date: date||'' }); };
+  data.transactions.forEach(t=>{
+    if(t.type==='charge'){
+      if(Array.isArray(t.payments)){
+        t.payments.forEach(pm=>{ if(pm.method==='cash'||pm.method==='shamcash'||pm.method==='platform') add(pm.method, pm.amount, 'تسديد كاشيرات', pm.date||t.date); });
+      } else if(t.status==='paid' && (t.method==='cash'||t.method==='shamcash'||t.method==='platform')){
+        add(t.method, t.amount, 'تسديد كاشيرات', t.date);
+      }
+      if(t.fundingSource==='shamcash') add('shamcash', -t.amount, 'شحن كاشيرات', t.date);
+      else if(t.fundingSource==='platform' || !t.fundingSource) add('platform', -t.amount, 'شحن كاشيرات', t.date);
+    } else if(t.type==='payout'){
+      const net = t.amount - (t.offset||0);
+      if(t.method==='cash'||t.method==='shamcash'||t.method==='platform') add(t.method, -net, 'تمرير ربح (كاشير / لاعب)', t.date);
+    }
+  });
+  (data.walletTransfers||[]).forEach(x=>{
+    const ft = transferFromTo(x);
+    add(ft.from, -transferSent(x), 'تحويل صادر', x.date);
+    add(ft.to, transferReceived(x), 'تحويل وارد', x.date);
+  });
+  (data.walletFunding||[]).forEach(x=>{
+    add(x.destination, x.amount, 'تمويل خارجي', x.date);
+    fundingPaymentsOf(x).forEach(pm=> add(pm.method, -pm.amount, 'دفع ثمن شحن المنصة', pm.date||x.date));
+  });
+  (data.platformPayins||[]).forEach(x=>{
+    add(x.destination, x.amount, x.smartId ? 'دفعة منصة (مرافقة لتمرير ربح كاشير)' : 'دفعة من المنصة (ربح لاعبين)', x.date);
+  });
+  (data.externalWithdrawals||[]).forEach(x=> add(x.source, -x.amount, 'سحب خارجي', x.date));
+  return ev;
+}
+function setAuditRange(kind){
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  let from, to;
+  if(kind==='today'){ from = to = todayISO(); }
+  else if(kind==='month'){ from = localDateStr(new Date(y,m,1)); to = todayISO(); }
+  else { from = localDateStr(new Date(y,m-1,1)); to = localDateStr(new Date(y,m,0)); }
+  document.getElementById('auditFrom').value = from;
+  document.getElementById('auditTo').value = to;
+  renderAudit();
+}
+function renderAudit(){
+  const fromEl = document.getElementById('auditFrom'), toEl = document.getElementById('auditTo');
+  if(!fromEl.value || !toEl.value){
+    const now = new Date();
+    if(!fromEl.value) fromEl.value = localDateStr(new Date(now.getFullYear(), now.getMonth(), 1));
+    if(!toEl.value) toEl.value = todayISO();
+  }
+  let from = fromEl.value, to = toEl.value;
+  const box = document.getElementById('auditResult');
+  if(from > to){ box.innerHTML = '<div class="empty">تاريخ البداية لازم يكون قبل تاريخ النهاية.</div>'; return; }
+  const ev = walletEvents();
+  const bal = (w, endExclusive, endInclusive) => ev.filter(e=> e.w===w && (endExclusive!==null ? e.date < endExclusive : e.date <= endInclusive)).reduce((s,e)=>s+e.amt,0);
+  const WN = { cash:'💵 الكاش', shamcash:'📱 شام كاش', platform:'🎰 المنصة' };
+  const wallets = ['platform','cash','shamcash'];
+  const sumOpen = {}, sumClose = {};
+  const walletCard = w => {
+    const open = bal(w, from, null), close = bal(w, null, to);
+    sumOpen[w] = open; sumClose[w] = close;
+    const inP = ev.filter(e=> e.w===w && e.date>=from && e.date<=to);
+    const grp = {};
+    inP.forEach(e=>{ const k=(e.amt>0?'+':'-')+e.label; grp[k] = (grp[k]||0) + e.amt; });
+    const line = (k,v) => `<div style="display:flex;justify-content:space-between;font-size:13.5px;padding:5px 0;border-bottom:1px solid var(--line);"><span>${escapeHTML(k.slice(1))}</span><span class="mono" style="color:${v>0?'var(--green)':'var(--rust)'};">${v>0?'+':'−'} ${fmt(Math.abs(v))}</span></div>`;
+    const ins = Object.keys(grp).filter(k=>grp[k]>0).map(k=>line(k,grp[k])).join('');
+    const outs = Object.keys(grp).filter(k=>grp[k]<0).map(k=>line(k,grp[k])).join('');
+    return `<div class="stat" style="background:var(--paper-raised);border:1px solid var(--line);margin-bottom:12px;padding:14px;">
+      <p style="font-size:15px;font-weight:600;margin:0 0 8px;">${WN[w]}</p>
+      <div style="display:flex;justify-content:space-between;font-size:14px;padding:4px 0;"><span>الرصيد بأول الفترة</span><span class="mono">${fmt(open)}</span></div>
+      ${ins || outs ? (ins ? '<p class="sub" style="margin:8px 0 2px;">دخل:</p>'+ins : '') + (outs ? '<p class="sub" style="margin:8px 0 2px;">طلع:</p>'+outs : '') : '<p class="sub" style="margin:8px 0;">ما في حركة بهالفترة.</p>'}
+      <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:600;padding:8px 0 0;"><span>الرصيد بآخر الفترة</span><span class="mono">${fmt(close)}</span></div>
+    </div>`;
+  };
+  const walletHTML = wallets.map(walletCard).join('');
+  const totOpen = wallets.reduce((s,w)=>s+sumOpen[w],0), totClose = wallets.reduce((s,w)=>s+sumClose[w],0);
+
+  // الكاشيرات والأرباح بالفترة
+  const inRange = d => d && d >= from && d <= to;
+  const charges = data.transactions.filter(t=>t.type==='charge' && inRange(t.date));
+  const chargedSum = charges.reduce((s,t)=>s+t.amount,0);
+  const payoutsTx = data.transactions.filter(t=>t.type==='payout' && inRange(t.date));
+  const payoutsSum = payoutsTx.reduce((s,t)=>s+t.amount,0);
+  const playerSum = (data.platformPayins||[]).filter(x=>!x.smartId && inRange(x.date)).reduce((s,x)=>s+x.amount,0);
+  const byMethod = { cash:0, shamcash:0, platform:0, offset:0 };
+  data.transactions.filter(t=>t.type==='charge').forEach(t=>{
+    if(Array.isArray(t.payments)){
+      t.payments.forEach(pm=>{ if(inRange(pm.date||t.date)) byMethod[pm.method] = (byMethod[pm.method]||0) + pm.amount; });
+    } else if(t.status==='paid' && inRange(t.date)){
+      byMethod[t.method] = (byMethod[t.method]||0) + t.amount;
+    }
+  });
+  const settledSum = Object.values(byMethod).reduce((s,v)=>s+v,0);
+  // ديون الكاشيرات المعلّقة بنهاية الفترة
+  let pendingEnd = 0;
+  data.transactions.filter(t=>t.type==='charge' && t.date && t.date<=to).forEach(t=>{
+    let paid = 0;
+    if(Array.isArray(t.payments)) paid = t.payments.filter(pm=>(pm.date||t.date)<=to).reduce((s,pm)=>s+pm.amount,0);
+    else if(t.status==='paid') paid = t.amount;
+    pendingEnd += Math.max(0, t.amount - paid);
+  });
+  const row = (k,v,extra) => `<div style="display:flex;justify-content:space-between;font-size:14px;padding:6px 0;border-bottom:1px solid var(--line);"><span>${k}${extra?` <span class="sub">${extra}</span>`:''}</span><span class="mono">${fmt(v)}</span></div>`;
+  const cashiersHTML = `<div class="stat" style="background:var(--paper-raised);border:1px solid var(--line);margin-bottom:12px;padding:14px;">
+      <p style="font-size:15px;font-weight:600;margin:0 0 8px;">👥 الكاشيرات والأرباح</p>
+      ${row('شحن الكاشيرات', chargedSum, `(${charges.length} عملية)`)}
+      ${row('تسديد الكاشيرات', settledSum)}
+      <div style="padding-right:12px;color:var(--ink-soft);">
+        ${byMethod.cash ? row('· كاش', byMethod.cash) : ''}${byMethod.shamcash ? row('· شام كاش', byMethod.shamcash) : ''}${byMethod.platform ? row('· عبر المنصة', byMethod.platform) : ''}${byMethod.offset ? row('· مقاصة من أرباح', byMethod.offset) : ''}
+      </div>
+      ${row('أرباح ممرّرة للكاشيرات', payoutsSum, `(${payoutsTx.length} عملية)`)}
+      ${row('أرباح لاعبين غير مسجّلين', playerSum)}
+      <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:600;padding:8px 0 0;"><span>الدخل (شحن − أرباح)</span><span class="mono">${fmt(chargedSum - payoutsSum - playerSum)}</span></div>
+      ${row('ديون الكاشيرات المعلّقة بآخر الفترة', pendingEnd)}
+    </div>`;
+
+  box.innerHTML = `
+    <div class="stat-row" style="margin-bottom:12px;">
+      <div class="stat" style="background:var(--green-soft);"><p class="k" style="color:var(--green);">مجموع المحافظ بأول الفترة</p><p class="v mono" style="color:var(--green);">${fmt(totOpen)}</p></div>
+      <div class="stat" style="background:var(--green-soft);"><p class="k" style="color:var(--green);">مجموع المحافظ بآخر الفترة</p><p class="v mono" style="color:var(--green);">${fmt(totClose)}</p></div>
+    </div>` + walletHTML + cashiersHTML;
+}
+
 function switchView(name){
   document.querySelectorAll('main section').forEach(s=>s.classList.remove('active'));
   document.getElementById('view-'+name).classList.add('active');
   document.querySelectorAll('nav.bottom button').forEach(b=>b.classList.toggle('active', b.dataset.view===name));
   if(name==='filter') renderFilter();
+  if(name==='audit') renderAudit();
 }
 
 // ---------- Add Transaction sheet ----------
