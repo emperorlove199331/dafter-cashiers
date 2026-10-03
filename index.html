@@ -426,7 +426,21 @@
       <button onclick="openAddTxn('payout')"><span class="qa-icon">🎯</span><span>تمرير ربح لاعب</span></button>
       <button onclick="openSettleAccountSheet()"><span class="qa-icon">✅</span><span>تسديد حساب</span></button>
     </div>
-    <h2 class="section-title">آخر العمليات</h2>
+    <h2 class="section-title">العمليات</h2>
+    <div class="field" style="margin-bottom:8px;">
+      <select id="recentMode" onchange="onRecentModeChange()">
+        <option value="last">آخر ٢٥ عملية</option>
+        <option value="all">كل العمليات</option>
+        <option value="month">شهر محدد</option>
+        <option value="range">من تاريخ إلى تاريخ</option>
+      </select>
+    </div>
+    <div id="recentMonthBox" class="field" style="display:none;margin-bottom:8px;"><select id="recentMonth" onchange="renderRecent()"></select></div>
+    <div id="recentRangeBox" class="btn-row" style="display:none;margin-bottom:8px;">
+      <div class="field" style="flex:1;margin:0;"><label>من</label><input type="date" id="recentFrom" onchange="renderRecent()"></div>
+      <div class="field" style="flex:1;margin:0;"><label>إلى</label><input type="date" id="recentTo" onchange="renderRecent()"></div>
+    </div>
+    <p id="recentSummary" style="font-size:13px;color:var(--ink-soft);margin:4px 0 8px;"></p>
     <div id="recentList"></div>
   </section>
 
@@ -1489,14 +1503,56 @@ function escapeHTML(s){
   return d.innerHTML;
 }
 
+let recentShown = 200;
+function onRecentModeChange(){
+  recentShown = 200;
+  const mode = document.getElementById('recentMode').value;
+  if(mode==='range'){
+    const f = document.getElementById('recentFrom'), t = document.getElementById('recentTo');
+    if(!f.value) f.value = localDateStr(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+    if(!t.value) t.value = todayISO();
+  }
+  renderRecent();
+}
 function renderRecent(){
-  const list = [...data.transactions].sort((a,b)=> sortKey(b).localeCompare(sortKey(a))).slice(0,25);
+  const mode = document.getElementById('recentMode').value;
+  // قائمة الأشهر (كل شهر فيه عمليات + الشهر الحالي)
+  const monthSel = document.getElementById('recentMonth');
+  const months = new Set([localMonthStr(new Date())]);
+  data.transactions.forEach(t=>{ if(t.date) months.add(t.date.slice(0,7)); });
+  const monthList = Array.from(months).sort().reverse();
+  const prevMonth = monthSel.value;
+  monthSel.innerHTML = monthList.map(m=>{ const [y,mo]=m.split('-'); return `<option value="${m}">${mo}/${y}</option>`; }).join('');
+  monthSel.value = monthList.includes(prevMonth) ? prevMonth : monthList[0];
+  document.getElementById('recentMonthBox').style.display = mode==='month' ? 'block' : 'none';
+  document.getElementById('recentRangeBox').style.display = mode==='range' ? 'flex' : 'none';
+
+  let list = [...data.transactions].sort((a,b)=> sortKey(b).localeCompare(sortKey(a)));
+  let cap = null;
+  if(mode==='last') cap = 25;
+  else if(mode==='month') list = list.filter(t=>t.date && t.date.startsWith(monthSel.value));
+  else if(mode==='range'){
+    const f = document.getElementById('recentFrom').value, to = document.getElementById('recentTo').value;
+    list = list.filter(t=>t.date && (!f || t.date>=f) && (!to || t.date<=to));
+  }
+  const total = list.length;
   const el = document.getElementById('recentList');
-  if(list.length===0){
-    el.innerHTML = '<div class="empty">ما في عمليات بعد. اضغط + لإضافة أول عملية.</div>';
+  const sum = document.getElementById('recentSummary');
+  if(total===0){
+    el.innerHTML = '<div class="empty">' + (data.transactions.length===0 ? 'ما في عمليات بعد. اضغط + لإضافة أول عملية.' : 'ما في عمليات بهالفترة.') + '</div>';
+    sum.textContent = '';
     return;
   }
-  el.innerHTML = list.map(t=>txnRowHTML(t, true)).join('');
+  const limit = cap || recentShown;
+  const shown = list.slice(0, limit);
+  if(mode==='last'){ sum.textContent = ''; }
+  else {
+    const charged = list.filter(t=>t.type==='charge').reduce((s,t)=>s+t.amount,0);
+    const payouts = list.filter(t=>t.type==='payout').reduce((s,t)=>s+t.amount,0);
+    sum.textContent = `${total} عملية — شحن ${fmt(charged)} — أرباح ممرّرة ${fmt(payouts)}`;
+  }
+  el.innerHTML = shown.map(t=>txnRowHTML(t, true)).join('') +
+    (!cap && total > shown.length ? `<button class="btn-secondary" style="margin-top:8px;" onclick="recentShown+=200; renderRecent();">عرض المزيد (${total - shown.length} متبقية)</button>` : '');
 }
 
 function renderCashiers(){
