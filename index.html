@@ -589,6 +589,8 @@
     <h2 class="section-title">أرصدة المحفظة</h2>
     <div id="walletBalanceBox" style="margin-bottom:20px;"></div>
 
+    <button class="btn-secondary" style="margin:-8px 0 20px;" onclick="openFeeCompSheet()">💰 تعويض / تصفية العمولة</button>
+
     <div id="fundingPendingSection" style="display:none;margin-bottom:20px;">
       <h2 class="section-title" style="color:var(--rust);">⏳ شحن المنصة المعلّق (دين للمموّل)</h2>
       <p style="font-size:13px;color:var(--ink-soft);margin-top:-8px;">منفصل عن ديون الكاشيرات. اضغط على أي دفعة لتسديدها.</p>
@@ -796,6 +798,36 @@
 </div>
 
 <!-- Transaction Detail Sheet -->
+<div class="overlay" id="feeCompOverlay">
+  <div class="sheet">
+    <h3 id="feeCompTitle">تعويض / تصفية العمولة</h3>
+    <p id="feeCompInfo" style="font-size:13px;color:var(--ink-soft);margin-bottom:12px;"></p>
+    <div class="field">
+      <label>مبلغ التعويض (ل.س)</label>
+      <input type="number" id="feeCompAmount" class="mono" placeholder="0">
+    </div>
+    <div class="field">
+      <label>انعوّض بـ (المحفظة يلي رجع إلها المبلغ)</label>
+      <div class="seg seg-sm">
+        <button type="button" id="feeCompCash" class="sel" onclick="setFeeCompWallet('cash')">كاش</button>
+        <button type="button" id="feeCompSham" onclick="setFeeCompWallet('shamcash')">شام كاش</button>
+        <button type="button" id="feeCompPlatform" onclick="setFeeCompWallet('platform')">المنصة</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>التاريخ</label>
+      <input type="date" id="feeCompDate">
+    </div>
+    <div class="field">
+      <label>ملاحظة (اختياري)</label>
+      <input type="text" id="feeCompNote" placeholder="مثلاً: تصفية شهر 9">
+    </div>
+    <button class="btn-primary" onclick="saveFeeComp()">حفظ التعويض</button>
+    <button class="btn-secondary" id="feeCompDeleteBtn" style="display:none;color:var(--rust); border-color:var(--rust-soft);" onclick="deleteFeeComp()">حذف التعويض</button>
+    <button class="btn-secondary" onclick="closeSheet('feeCompOverlay')">إلغاء</button>
+  </div>
+</div>
+
 <div class="overlay" id="feeReportOverlay">
   <div class="sheet">
     <h3>تقرير العمولة — من وين إجت</h3>
@@ -2058,6 +2090,9 @@ function openLogDetail(id){
     } else if(ref.k==='reconcile'){
       const r = find(data.reconciliations, ref.id);
       if(r){ openFn = `openReconcileSheet('${r.id}')`; openLabel = 'فتح التسوية وتعديلها'; } else rows.push(['الحالة','هذه التسوية انحذفت']);
+    } else if(ref.k==='feeComp'){
+      const r = find(data.feeCompensations, ref.id);
+      if(r){ openFn = `openFeeCompSheet('${r.id}')`; openLabel = 'فتح التعويض وتعديله'; } else rows.push(['الحالة','هذا التعويض انحذف']);
     } else if(ref.k==='settleAcc'){
       extra = '<p class="sub" style="margin:10px 0 6px;">العمليات يلي انسدّدت (اضغط على أي وحدة لتفاصيلها وتعديلها):</p>' +
         (ref.items||[]).map(it=>{
@@ -2269,12 +2304,72 @@ function getWalletTotals(){
   const withdrawCash = withdrawals.filter(x=>x.source==='cash').reduce((s,x)=>s+x.amount,0);
   const withdrawSham = withdrawals.filter(x=>x.source==='shamcash').reduce((s,x)=>s+x.amount,0);
   const withdrawPlatform = withdrawals.filter(x=>x.source==='platform').reduce((s,x)=>s+x.amount,0);
-  const cashBalance = paidCash - payoutCash + walletDelta.cash + fundingCash + platformCash - withdrawCash - fundPaidCash;
-  const shamBalance = paidSham - payoutSham + walletDelta.shamcash + fundingSham + platformSham - chargeFundedSham - withdrawSham - fundPaidSham;
-  const platformBalance = walletDelta.platform + fundingPlatform + platformPlatform - chargeFundedPlatform - withdrawPlatform + paidPlatform - payoutPlatform;
+  // تعويض العمولة: مبلغ بيرجع للمحفظة (مثلاً المموّل عوّضك الخسارة كاش) وبينخصم من العمولة المتبقية
+  const comps = data.feeCompensations || [];
+  const compCash = comps.filter(x=>x.wallet==='cash').reduce((s,x)=>s+x.amount,0);
+  const compSham = comps.filter(x=>x.wallet==='shamcash').reduce((s,x)=>s+x.amount,0);
+  const compPlatform = comps.filter(x=>x.wallet==='platform').reduce((s,x)=>s+x.amount,0);
+  const cashBalance = paidCash - payoutCash + walletDelta.cash + fundingCash + platformCash - withdrawCash - fundPaidCash + compCash;
+  const shamBalance = paidSham - payoutSham + walletDelta.shamcash + fundingSham + platformSham - chargeFundedSham - withdrawSham - fundPaidSham + compSham;
+  const platformBalance = walletDelta.platform + fundingPlatform + platformPlatform - chargeFundedPlatform - withdrawPlatform + paidPlatform - payoutPlatform + compPlatform;
   return { cashBalance, shamBalance, platformBalance };
 }
 // إجمالي عمولة التحويلات (المبلغ يلي حوّلته ناقص يلي وصل فعليًا) عبر كل سجلات التحويل — رقم منفصل وواضح، مش مدمج بصمت جوا مجموع المحافظ
+function getFeeCompTotal(){ return (data.feeCompensations||[]).reduce((s,x)=>s+x.amount,0); }
+function getFeeOutstanding(){ return getTotalTransferFee() + getTotalFundingFee() - getFeeCompTotal(); }
+let editingFeeCompId = null, feeCompWallet = 'cash';
+function setFeeCompWallet(w){
+  feeCompWallet = w;
+  document.getElementById('feeCompCash').classList.toggle('sel', w==='cash');
+  document.getElementById('feeCompSham').classList.toggle('sel', w==='shamcash');
+  document.getElementById('feeCompPlatform').classList.toggle('sel', w==='platform');
+}
+function openFeeCompSheet(id){
+  editingFeeCompId = id || null;
+  const x = id ? (data.feeCompensations||[]).find(c=>c.id===id) : null;
+  const outstanding = getFeeOutstanding();
+  document.getElementById('feeCompTitle').textContent = x ? 'تعديل تعويض عمولة' : 'تعويض / تصفية العمولة';
+  document.getElementById('feeCompInfo').textContent =
+    `العمولة الكلية ${fmt(getTotalTransferFee()+getTotalFundingFee())} — معوَّض ${fmt(getFeeCompTotal())} — المتبقي ${fmt(outstanding)} ل.س`;
+  document.getElementById('feeCompAmount').value = x ? x.amount : (outstanding>0 ? outstanding : '');
+  document.getElementById('feeCompDate').value = x ? x.date : todayISO();
+  document.getElementById('feeCompNote').value = x ? (x.note||'') : '';
+  setFeeCompWallet(x ? x.wallet : 'cash');
+  document.getElementById('feeCompDeleteBtn').style.display = x ? 'block' : 'none';
+  closeSheet('feeReportOverlay');
+  document.getElementById('feeCompOverlay').classList.add('show');
+}
+function saveFeeComp(){
+  const amount = Number(document.getElementById('feeCompAmount').value);
+  const date = document.getElementById('feeCompDate').value;
+  const note = document.getElementById('feeCompNote').value.trim();
+  if(!amount || amount<=0){ showToast('أدخل مبلغ التعويض'); return; }
+  if(!date){ showToast('اختر التاريخ'); return; }
+  if(date > todayISO()){ showToast('التاريخ ما لازم يكون بالمستقبل'); return; }
+  if(!data.feeCompensations) data.feeCompensations = [];
+  const old = editingFeeCompId ? data.feeCompensations.find(c=>c.id===editingFeeCompId) : null;
+  const max = getFeeOutstanding() + (old ? old.amount : 0);
+  if(amount > max){ showToast(`المبلغ أكبر من العمولة المتبقية (${fmt(max)} ل.س)`); return; }
+  let rec;
+  if(old){ old.amount = amount; old.wallet = feeCompWallet; old.date = date; old.note = note; rec = old; }
+  else { rec = { id: uid(), amount, wallet: feeCompWallet, date, time: nowTime(), note }; data.feeCompensations.push(rec); }
+  logActivity(old ? 'تعديل تعويض عمولة' : 'تعويض عمولة', `${WALLET_LABELS[feeCompWallet]} — ${fmt(amount)} ل.س${note ? ' — '+note : ''}`, {k:'feeComp', id:rec.id});
+  saveData();
+  closeSheet('feeCompOverlay');
+  renderAll();
+  showToast('تم تسجيل تعويض العمولة');
+}
+function deleteFeeComp(){
+  const old = (data.feeCompensations||[]).find(c=>c.id===editingFeeCompId);
+  if(!old) return;
+  if(!confirm('حذف هالتعويض؟ رح ترجع العمولة متبقية وبينخصم المبلغ من المحفظة.')) return;
+  data.feeCompensations = data.feeCompensations.filter(c=>c.id!==old.id);
+  logActivity('حذف تعويض عمولة', `${WALLET_LABELS[old.wallet]} — ${fmt(old.amount)} ل.س`);
+  saveData();
+  closeSheet('feeCompOverlay');
+  renderAll();
+  showToast('تم حذف التعويض');
+}
 // تقرير العمولة: كل تحويل أو شحن منصة فيه عمولة، مع إمكانية الفلترة بالشهر والضغط لفتح السجل
 function openFeeReport(){
   const set = new Set();
@@ -2293,13 +2388,17 @@ function renderFeeReport(){
   const tr = (data.walletTransfers||[]).filter(x=>transferFee(x)>0 && ok(x.date)).sort((a,b)=>sortKey(b).localeCompare(sortKey(a)));
   const fu = (data.walletFunding||[]).filter(x=>x.fee>0 && ok(x.date)).sort((a,b)=>sortKey(b).localeCompare(sortKey(a)));
   const trSum = tr.reduce((s,x)=>s+transferFee(x),0), fuSum = fu.reduce((s,x)=>s+x.fee,0);
+  const comps = (data.feeCompensations||[]).filter(x=>ok(x.date)).sort((a,b)=>sortKey(b).localeCompare(sortKey(a)));
+  const compSum = comps.reduce((s,x)=>s+x.amount,0);
   const box = document.getElementById('feeReportBody');
   const srcLabel = x => x.paySource==='cash' ? 'من الكاش' : x.paySource==='shamcash' ? 'من شام كاش' : x.paySource==='pending' ? 'معلّق' : '';
   const sum = (k,v) => `<div style="display:flex;justify-content:space-between;font-size:14px;padding:6px 0;border-bottom:1px solid var(--line);"><span>${k}</span><span class="mono">${fmt(v)}</span></div>`;
   let html = `<div class="stat" style="background:var(--rust-soft);padding:12px;margin-bottom:10px;">
       ${sum('عمولة التحويلات بين المحافظ (' + tr.length + ')', trSum)}
       ${sum('عمولة شحن المنصة (' + fu.length + ')', fuSum)}
-      <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:600;padding-top:8px;"><span>المجموع</span><span class="mono">${fmt(trSum+fuSum)}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:600;padding-top:8px;"><span>مجموع العمولة</span><span class="mono">${fmt(trSum+fuSum)}</span></div>
+      ${sum('معوَّض (تعويض مسجّل)', compSum)}
+      <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:600;padding-top:8px;"><span>المتبقي غير المعوَّض</span><span class="mono">${fmt(trSum+fuSum-compSum)}</span></div>
     </div>`;
   if(fu.length){
     html += '<p class="sub" style="margin:8px 0 4px;">شحن المنصة (اضغط للتعديل):</p>' + fu.map(x=>`
@@ -2318,7 +2417,16 @@ function renderFeeReport(){
         <div class="amount mono pending">${fmt(transferFee(x))}</div>
       </div>`; }).join('');
   }
-  if(!fu.length && !tr.length) html += '<div class="empty">ما في عمولات بهالفترة.</div>';
+  if(comps.length){
+    html += '<p class="sub" style="margin:8px 0 4px;">التعويضات المسجّلة (اضغط للتعديل):</p>' + comps.map(x=>`
+      <div class="row" style="cursor:pointer;" onclick="openFeeCompSheet('${x.id}')">
+        <div class="main"><p class="name">💰 تعويض عمولة ← ${WALLET_LABELS[x.wallet]}</p>
+        <p class="sub"><span>${fmtDT(x)}</span>${x.note ? ' · '+escapeHTML(x.note) : ''}</p></div>
+        <div class="amount mono in">${fmt(x.amount)}</div>
+      </div>`).join('');
+  }
+  if(!fu.length && !tr.length && !comps.length) html += '<div class="empty">ما في عمولات بهالفترة.</div>';
+  html += '<button class="btn-primary" style="margin-top:10px;" onclick="openFeeCompSheet()">💰 تعويض / تصفية العمولة</button>';
   box.innerHTML = html;
 }
 function getTotalTransferFee(){
@@ -2394,17 +2502,19 @@ function renderWalletBalance(){
   const { cashBalance, shamBalance, platformBalance } = getWalletTotals();
   const totalTransferFee = getTotalTransferFee() + getTotalFundingFee();
   const rawFee = getTotalTransferFee() + getRecognizedFundingFee();
+  const feeCompTotal = getFeeCompTotal();
+  const feeOutstanding = totalTransferFee - feeCompTotal;   // العمولة المتبقية (غير المعوَّضة)
   const fundingOwedTotal = getTotalFundingOwed();
   // "قبل العمولة" = إجمالي خام ثابت، ما بينخصم منه أي عمولة تحويل تلقائيًا مع كل تحويل تسويه.
   // أرصدة المحافظ الفعلية (cashBalance/shamBalance/platformBalance) هي المبلغ الحقيقي الموجود فعليًا بكل محفظة،
   // وهاد أصلاً متأثر بخصم عمولة التحويلات (لأنه هيك المصاري الحقيقية تنخصم). فلحساب "الخام" بنرجع نضيف عمولة
   // التحويلات مرة وحدة على مجموع الأرصدة الفعلية، حتى يضل الرقم الخام ثابت ومش منخفض تلقائيًا مع كل تحويل.
-  const totalBeforeCommission = cashBalance + shamBalance + platformBalance + rawFee;
+  const totalBeforeCommission = cashBalance + shamBalance + platformBalance + rawFee - feeCompTotal;
   // رأس المال = كل الديون المعلّقة (على كل الكاشيرات، كل الوقت) + أرصدة المحافظ الفعلية الثلاثة.
   const totalPendingAll = data.transactions.filter(t=>t.type==='charge').reduce((s,t)=>s+remainingOf(t),0);
   const totalCapitalNet = totalPendingAll + platformBalance + cashBalance + shamBalance - fundingOwedTotal;
   // مجموع رأس المال مع العمولة = رأس المال الفعلي + كل العمولات يلي انخصمت (تحويلات + شحن المنصة)
-  const totalCapital = totalCapitalNet + totalTransferFee;
+  const totalCapital = totalCapitalNet + feeOutstanding;
   el.innerHTML = `
     <div class="stat-row" style="margin-bottom:10px;">
       <div class="stat" style="background:var(--green-soft);">
@@ -2430,8 +2540,9 @@ function renderWalletBalance(){
     </div>
     <div class="stat-row" style="margin-bottom:10px;">
       <div class="stat" style="background:var(--rust-soft); cursor:pointer;" onclick="openFeeReport()">
-        <p class="k" style="color:var(--rust);">📉 عمولة التحويل وشحن المنصة (تراكمية) — اضغط للتقرير</p>
-        <p class="v mono" style="color:var(--rust);">${fmt(totalTransferFee)}</p>
+        <p class="k" style="color:var(--rust);">📉 العمولة المتبقية (غير المعوَّضة) — اضغط للتقرير</p>
+        <p class="v mono" style="color:var(--rust);">${fmt(feeOutstanding)}</p>
+        ${feeCompTotal>0 ? `<p class="sub" style="margin:4px 0 0;font-size:12px;">الإجمالي ${fmt(totalTransferFee)} — معوَّض ${fmt(feeCompTotal)}</p>` : ''}
       </div>
     </div>
     <div class="stat-row">
@@ -3017,7 +3128,8 @@ function renderWalletHistory(){
   const funding = (data.walletFunding||[]).map(x=>({...x, kind:'funding'}));
   const platformIn = (data.platformPayins||[]).map(x=>({...x, kind:'platform'}));
   const withdrawals = (data.externalWithdrawals||[]).map(x=>({...x, kind:'withdraw'}));
-  const all = [...transfers, ...funding, ...platformIn, ...withdrawals].sort((a,b)=> sortKey(b).localeCompare(sortKey(a)));
+  const feeComps = (data.feeCompensations||[]).map(x=>({...x, kind:'feecomp'}));
+  const all = [...transfers, ...funding, ...platformIn, ...withdrawals, ...feeComps].sort((a,b)=> sortKey(b).localeCompare(sortKey(a)));
   if(all.length===0){
     el.innerHTML = '<div class="empty">ما في حركات محفظة مسجّلة بعد.</div>';
     return;
@@ -3029,11 +3141,14 @@ function renderWalletHistory(){
         ? `💰 تمويل مموّل رئيسي ← ${WALLET_LABELS[x.destination]}`
         : x.kind==='platform'
           ? `🏦 دفعة من المنصة ← ${WALLET_LABELS[x.destination]}`
-          : `🏧 سحب خارجي ← من ${WALLET_LABELS[x.source]}`;
+          : x.kind==='feecomp'
+            ? `💰 تعويض عمولة ← ${WALLET_LABELS[x.wallet]}`
+            : `🏧 سحب خارجي ← من ${WALLET_LABELS[x.source]}`;
     const clickAttr = x.kind==='funding' ? ` style="cursor:pointer;" onclick="openFundingSheet('${x.id}')"`
       : x.kind==='platform' ? ` style="cursor:pointer;" onclick="openPlatformPayinSheet('${x.id}')"`
       : x.kind==='transfer' ? ` style="cursor:pointer;" onclick="openTransferSheet('${x.id}')"`
       : x.kind==='withdraw' ? ` style="cursor:pointer;" onclick="openWithdrawSheet('${x.id}')"`
+      : x.kind==='feecomp' ? ` style="cursor:pointer;" onclick="openFeeCompSheet('${x.id}')"`
       : ` style="cursor:default;"`;
     let amountHTML;
     if(x.kind==='transfer'){
@@ -3107,6 +3222,7 @@ function walletEvents(){
     add(x.destination, x.amount, x.smartId ? 'دفعة منصة (مرافقة لتمرير ربح كاشير)' : 'دفعة من المنصة (ربح لاعبين)', x.date);
   });
   (data.externalWithdrawals||[]).forEach(x=> add(x.source, -x.amount, 'سحب خارجي', x.date));
+  (data.feeCompensations||[]).forEach(x=> add(x.wallet, x.amount, 'تعويض عمولة', x.date));
   return ev;
 }
 function setAuditRange(kind){
