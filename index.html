@@ -814,6 +814,35 @@
   </div>
 </div>
 
+<div class="overlay" id="paymentEditOverlay">
+  <div class="sheet">
+    <h3 id="payEditTitle">تفاصيل التسديد</h3>
+    <p id="payEditInfo" style="font-size:13px;color:var(--ink-soft);margin-bottom:12px;"></p>
+    <div id="payEditForm">
+      <div class="field">
+        <label>المبلغ (ل.س)</label>
+        <input type="number" id="payEditAmount" class="mono" placeholder="0">
+      </div>
+      <div class="field">
+        <label>طريقة التسديد</label>
+        <div class="seg seg-sm">
+          <button type="button" id="payEditCash" class="sel" onclick="setPayEditMethod('cash')">كاش</button>
+          <button type="button" id="payEditSham" onclick="setPayEditMethod('shamcash')">شام كاش</button>
+          <button type="button" id="payEditPlatform" onclick="setPayEditMethod('platform')">المنصة</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>التاريخ</label>
+        <input type="date" id="payEditDate">
+      </div>
+      <button class="btn-primary" onclick="savePaymentEdit()">حفظ التعديل</button>
+      <button class="btn-secondary" style="color:var(--rust); border-color:var(--rust-soft);" onclick="deletePaymentEdit()">حذف هذا التسديد</button>
+    </div>
+    <button class="btn-secondary" id="payEditOpenPayout" style="display:none;" onclick="openPayoutOfPayment()">فتح عملية تمرير الربح المرتبطة</button>
+    <button class="btn-secondary" onclick="closeSheet('paymentEditOverlay')">إغلاق</button>
+  </div>
+</div>
+
 <div class="overlay" id="txnDetailOverlay">
   <div class="sheet">
     <h3>تفاصيل العملية</h3>
@@ -3682,6 +3711,23 @@ function openTxnDetail(id){
       <div class="amount" style="font-size:14px;font-weight:500;">${escapeHTML(String(v))}</div>
     </div>`).join('');
 
+  if(isCharge){
+    const pays = effectivePayments(t);
+    let run = t.amount;
+    const payRows = pays.map((pm,idx)=>{
+      run -= pm.amount;
+      const linked = pm.smartId || pm.method==='offset';
+      return `<div class="row" style="cursor:pointer;" onclick="openPaymentEdit('${t.id}', ${idx})">
+        <div class="main"><p class="name">${labelMethod(pm.method)}${linked ? ' · مرتبط بتمرير ربح' : ''}</p>
+        <p class="sub">${fmtDT(pm)} · المتبقي بعدها <span class="mono">${fmt(Math.max(0,run))}</span></p></div>
+        <div class="amount mono in">${fmt(pm.amount)}</div></div>`;
+    }).join('');
+    document.getElementById('txnDetailBody').innerHTML += `
+      <p class="sub" style="margin:12px 0 4px;font-weight:600;">سجل التسديدات (${pays.length}) — اضغط على أي تسديد للتفاصيل والتعديل</p>
+      ${pays.length ? payRows : '<div class="empty" style="padding:10px;">ما في تسديدات لهالشحنة بعد.</div>'}
+      <div style="display:flex;justify-content:space-between;font-size:14px;padding:8px 0;"><span>المسدد</span><span class="mono">${fmt(paidAmountOf(t))}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:14px;padding:0 0 8px;"><span>المتبقي</span><span class="mono">${fmt(remainingOf(t))}</span></div>`;
+  }
   document.getElementById('detailSettleBtn').style.display = (isCharge && t.status!=='paid') ? 'block' : 'none';
   document.getElementById('detailSettleBtn').textContent = (isCharge && t.status==='partial') ? 'تسجيل دفعة إضافية' : 'تأكيد التسديد';
   document.getElementById('txnDetailOverlay').classList.add('show');
@@ -3742,6 +3788,100 @@ async function shareReceipt(){
   }, 300);
 }
 
+// ---------- تفاصيل وتعديل التسديدات ----------
+// الشحنات القديمة المسددة بدون سجل دفعات بتنعرض كدفعة وحدة بتاريخ الشحن
+function effectivePayments(t){
+  if(Array.isArray(t.payments)) return t.payments;
+  if(t.status==='paid') return [{ amount: t.amount, method: t.method, date: t.date, time: t.time||'' }];
+  return [];
+}
+function recalcChargeFromPayments(t){
+  const pays = t.payments || [];
+  const collected = pays.reduce((s,p)=>s+p.amount,0);
+  t.status = collected >= t.amount ? 'paid' : (collected>0 ? 'partial' : 'pending');
+  if(pays.length){
+    const last = [...pays].sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')))[pays.length-1];
+    if(last.method!=='offset') t.method = last.method;
+    t.settledDate = last.date; t.settledTime = last.time || '';
+  } else { delete t.settledDate; delete t.settledTime; }
+}
+let payEditTxnId = null, payEditIdx = null, payEditMethod = 'cash';
+function setPayEditMethod(m){
+  payEditMethod = m;
+  document.getElementById('payEditCash').classList.toggle('sel', m==='cash');
+  document.getElementById('payEditSham').classList.toggle('sel', m==='shamcash');
+  document.getElementById('payEditPlatform').classList.toggle('sel', m==='platform');
+}
+function openPaymentEdit(tid, idx){
+  const t = data.transactions.find(x=>x.id===tid);
+  if(!t) return;
+  const pm = effectivePayments(t)[idx];
+  if(!pm) return;
+  payEditTxnId = tid; payEditIdx = idx;
+  const linked = pm.smartId || pm.method==='offset';
+  document.getElementById('payEditInfo').textContent =
+    `${cashierName(t.cashierId)} — شحنة ${fmt(t.amount)} ل.س (${t.date}) · ${linked ? 'تسديد مرتبط بتمرير ربح' : 'تسديد بتاريخ ' + fmtDT(pm)}`;
+  document.getElementById('payEditForm').style.display = linked ? 'none' : 'block';
+  document.getElementById('payEditOpenPayout').style.display = linked ? 'block' : 'none';
+  if(linked){
+    document.getElementById('payEditInfo').textContent += ` — المبلغ ${fmt(pm.amount)} ل.س. هالتسديد انخصم تلقائياً من ربح لاعب، عدّله أو احذفه من عملية تمرير الربح نفسها.`;
+  } else {
+    document.getElementById('payEditAmount').value = pm.amount;
+    document.getElementById('payEditDate').value = pm.date || t.date;
+    setPayEditMethod(pm.method==='shamcash' || pm.method==='platform' ? pm.method : 'cash');
+  }
+  closeSheet('txnDetailOverlay');
+  document.getElementById('paymentEditOverlay').classList.add('show');
+}
+function savePaymentEdit(){
+  const t = data.transactions.find(x=>x.id===payEditTxnId);
+  if(!t) return;
+  const amount = Number(document.getElementById('payEditAmount').value);
+  const date = document.getElementById('payEditDate').value;
+  if(!amount || amount<=0){ showToast('أدخل مبلغ صحيح'); return; }
+  if(!date){ showToast('اختر التاريخ'); return; }
+  if(date > todayISO()){ showToast('التاريخ ما لازم يكون بالمستقبل'); return; }
+  const pays = effectivePayments(t).map(p=>({...p}));
+  const others = pays.reduce((s,p,i)=> i===payEditIdx ? s : s+p.amount, 0);
+  if(others + amount > t.amount){ showToast(`المجموع بيتجاوز مبلغ الشحنة — الأقصى لهالتسديد ${fmt(t.amount - others)} ل.س`); return; }
+  const before = pays[payEditIdx];
+  const changes = [];
+  if(before.amount!==amount) changes.push(`المبلغ: ${fmt(before.amount)} ⬅ ${fmt(amount)}`);
+  if(before.method!==payEditMethod) changes.push(`الطريقة: ${labelMethod(before.method)} ⬅ ${labelMethod(payEditMethod)}`);
+  if((before.date||'')!==date) changes.push(`التاريخ: ${before.date||''} ⬅ ${date}`);
+  pays[payEditIdx] = { ...before, amount, method: payEditMethod, date };
+  t.payments = pays;
+  recalcChargeFromPayments(t);
+  logActivity('تعديل تسديد', `${cashierName(t.cashierId)} — ` + (changes.length ? changes.join(' | ') : 'لا تغييرات فعلية'), {k:'txn', id:t.id});
+  saveData();
+  closeSheet('paymentEditOverlay');
+  renderAll();
+  openTxnDetail(t.id);
+  showToast('تم تعديل التسديد');
+}
+function deletePaymentEdit(){
+  const t = data.transactions.find(x=>x.id===payEditTxnId);
+  if(!t) return;
+  if(!confirm('حذف هذا التسديد؟ رح يرجع المبلغ دين معلّق على الكاشير.')) return;
+  const pays = effectivePayments(t).map(p=>({...p}));
+  const removed = pays.splice(payEditIdx, 1)[0];
+  t.payments = pays;
+  recalcChargeFromPayments(t);
+  logActivity('حذف تسديد', `${cashierName(t.cashierId)} — ${fmt(removed.amount)} ل.س (${labelMethod(removed.method)})`, {k:'txn', id:t.id});
+  saveData();
+  closeSheet('paymentEditOverlay');
+  renderAll();
+  openTxnDetail(t.id);
+  showToast('تم حذف التسديد');
+}
+function openPayoutOfPayment(){
+  const t = data.transactions.find(x=>x.id===payEditTxnId);
+  if(!t) return;
+  const pm = effectivePayments(t)[payEditIdx];
+  const payout = pm && pm.smartId ? data.transactions.find(x=>x.type==='payout' && x.smartId===pm.smartId) : null;
+  closeSheet('paymentEditOverlay');
+  if(payout) openTxnDetail(payout.id); else showToast('ما لقيت عملية التمرير المرتبطة');
+}
 function settleFromDetail(){
   closeSheet('txnDetailOverlay');
   openSettle(detailTxnId);
