@@ -535,7 +535,7 @@
   }
   .chart-card::before{
     content:''; position:absolute; inset:0 0 auto 0; height:1px;
-    background:linear-gradient(90deg,transparent,rgba(124,92,255,.8),rgba(34,211,238,.8),transparent);
+    background:linear-gradient(90deg,transparent,rgba(212,175,106,.8),rgba(201,142,90,.7),transparent);
   }
   .chart-title{ font-size:13px; color:var(--ink-soft); margin:0 0 6px; display:flex; justify-content:space-between; align-items:center; }
   .chart-title b{ color:var(--ink); font-weight:600; font-size:14px; }
@@ -546,7 +546,7 @@
   .hbar .hn{ flex:0 0 72px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink); }
   .hbar .hb{ flex:1; height:12px; border-radius:8px; background:rgba(255,255,255,.07); position:relative; overflow:hidden; }
   .hbar .hb i{ position:absolute; top:0; bottom:0; right:0; border-radius:8px; transform-origin:right; animation:growX .9s cubic-bezier(.2,.9,.3,1) both; }
-  .hbar .hb i.c{ background:linear-gradient(270deg,#7C5CFF,#22D3EE); }
+  .hbar .hb i.c{ background:linear-gradient(270deg,#B58A3C,#EBCB8A); }
   .hbar .hb i.p{ background:linear-gradient(270deg,#F43F5E,#FB923C); height:50%; top:auto; bottom:0; opacity:.95; }
   .hbar .hv{ flex:0 0 auto; min-width:58px; text-align:left; font-family:'IBM Plex Mono',monospace; color:var(--ink-soft); }
   .legend{ display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--ink-soft); margin-top:6px; }
@@ -749,6 +749,54 @@
   .ab-row:last-child{ border-bottom:0; }
   .ab-row span:first-child{ color:var(--ink-soft); }
 </style>
+
+<style id="gold-theme">
+  :root{
+    --paper:#0B0B0D; --paper-raised:rgba(255,255,255,.045); --ink:#F3EFE6; --ink-soft:#A39D90; --line:rgba(255,255,255,.08);
+    --green:#6FD79A; --green-soft:rgba(111,215,154,.14); --rust:#F0705F; --rust-soft:rgba(240,112,95,.14);
+    --brass:#D9B26A; --brass-soft:rgba(217,178,106,.15); --violet:#D4AF6A; --cyan:#E9C98A;
+    --grad:linear-gradient(135deg,#E6C47E 0%,#B58A3C 100%); --grad2:linear-gradient(135deg,#EBCB8A,#B58A3C);
+    --navbg:rgba(21,21,23,.84);
+  }
+  body{
+    background:radial-gradient(circle at 88% -6%,rgba(212,175,106,.20),transparent 52%),
+               radial-gradient(circle at -12% 46%,rgba(212,175,106,.07),transparent 50%), #0B0B0D;
+    background-attachment:fixed;
+  }
+  header.top{
+    border:1px solid rgba(255,255,255,.09);
+    background:linear-gradient(155deg,#1D1C1A 0%,#131314 58%,#0F0F10 100%);
+    box-shadow:0 18px 40px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.05);
+  }
+  header.top::before{ background:radial-gradient(circle,rgba(212,175,106,.30),transparent 65%); }
+  header.top .capital{ -webkit-text-fill-color:#F6F1E6; color:#F6F1E6; }
+  header.top .capital small{ -webkit-text-fill-color:rgba(243,239,230,.6); }
+  header.top .stat{ background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); }
+  .header-search-btn, .pct-box{ background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12); }
+  .header-search-btn:disabled{ opacity:.32; }
+  .header-search-btn.hdr-undo{ top:12px; left:56px; }
+  .header-search-btn.hdr-redo{ top:54px; left:56px; }
+  .header-search-btn.hdr-eye.on{ background:rgba(212,175,106,.25); border-color:rgba(212,175,106,.55); }
+  .quick-actions button:nth-child(1){ background:linear-gradient(145deg,#EBCB8A,#B58A3C); color:#1A1306; box-shadow:0 12px 26px -12px rgba(212,175,106,.7), inset 0 1px 0 rgba(255,255,255,.35); }
+  .quick-actions button:nth-child(2){ background:linear-gradient(145deg,#C98E5A,#8A5731); color:#FFF4E6; box-shadow:0 12px 26px -12px rgba(201,142,90,.6), inset 0 1px 0 rgba(255,255,255,.2); }
+  .quick-actions button:nth-child(3){ background:linear-gradient(145deg,#2B2A2C,#1B1B1D); color:#EBCB8A; border:1px solid rgba(212,175,106,.45); box-shadow:0 12px 26px -12px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.08); }
+  .btn-primary{ background:var(--grad); color:#1A1306; font-weight:600; box-shadow:0 12px 26px -12px rgba(212,175,106,.7), inset 0 1px 0 rgba(255,255,255,.35); }
+  .seg button.sel{ background:var(--grad); color:#1A1306; font-weight:600; box-shadow:0 8px 18px -10px rgba(212,175,106,.8); }
+  .field input:focus, .field select:focus, .field textarea:focus, .pw-row input:focus{
+    border-color:#D4AF6A; background:rgba(212,175,106,.08); box-shadow:0 0 0 3px rgba(212,175,106,.22);
+  }
+  .fab{ background:var(--grad2); color:#1A1306; box-shadow:0 12px 28px -8px rgba(212,175,106,.6), inset 0 1px 0 rgba(255,255,255,.4); }
+  nav.bottom{ border:1px solid rgba(255,255,255,.08); }
+  nav.bottom button.active{ background:var(--grad); color:#1A1306; box-shadow:0 8px 18px rgba(212,175,106,.35); }
+  .sheet, #drawer{ background:#141415; }
+  .dr-ic{ background:rgba(212,175,106,.15); }
+  .wz-dots i.done{ background:rgba(212,175,106,.5); }
+  .wz-ok{ color:#6FD79A; }
+  .badge.method{ background:rgba(212,175,106,.14); color:#E9C98A; }
+  .toast{ white-space:normal; width:max-content; max-width:min(88vw,360px); text-align:center; line-height:1.65;
+    background:rgba(27,26,24,.96); border:1px solid rgba(212,175,106,.35); }
+  #fundingPayHistory button{ white-space:nowrap; }
+</style>
 </head>
 <body>
 
@@ -759,6 +807,8 @@
   <button class="header-search-btn" onclick="openQuickSearch()" aria-label="بحث سريع">🔎</button>
   <button class="header-search-btn hdr-menu" onclick="openDrawer()" aria-label="القائمة والإعدادات"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
   <button class="header-search-btn hdr-eye" id="eyeBtn" onclick="togglePrivacy()" aria-label="إخفاء/إظهار الأرقام"><svg id="eyeOpenIc" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><svg id="eyeOffIc" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none"><path d="M3 3l18 18M10.6 5.1A10.9 10.9 0 0112 5c6.4 0 10 7 10 7a17 17 0 01-3.2 4.2M6.6 6.6A16.6 16.6 0 002 12s3.6 7 10 7a10.6 10.6 0 004.4-.9M9.9 9.9a3 3 0 004.2 4.2"/></svg></button>
+  <button class="header-search-btn hdr-undo" id="undoBtn" onclick="undoStep()" aria-label="تراجع" disabled><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></button>
+  <button class="header-search-btn hdr-redo" id="redoBtn" onclick="redoStep()" aria-label="تقدّم" disabled><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 000 11H13"/></svg></button>
   <div class="pct-box mono">
     <p>35% <span class="val" id="pct35">0</span></p>
     <p>40% <span class="val" id="pct40">0</span></p>
@@ -969,6 +1019,7 @@
 <button class="dr-item " onclick="drawerGo('lock')"><span class="dr-ic">🔒</span><span class="dr-tx"><b>قفل التطبيق والبصمة</b><small id="ds-lock">—</small></span><svg class="dr-chev" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
 <button class="dr-item " onclick="drawerGo('idle')"><span class="dr-ic">⏱️</span><span class="dr-tx"><b>الخمول</b><small id="ds-idle">—</small></span><svg class="dr-chev" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
 <div class="dr-group">البيانات والتقارير</div>
+<button class="dr-item " onclick="openOpeningFromDrawer()"><span class="dr-ic">🏁</span><span class="dr-tx"><b>رصيد افتتاحي</b><small id="ds-opening">ديون سابقة + أرصدة المحافظ</small></span><svg class="dr-chev" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
 <button class="dr-item " onclick="openMonthWizardFromDrawer()"><span class="dr-ic">🧭</span><span class="dr-tx"><b>معالج إغلاق الشهر</b><small id="ds-wizard">مراجعة ← ملخص ← نسخة ← قفل</small></span><svg class="dr-chev" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
 <button class="dr-item " onclick="drawerGo('backup')"><span class="dr-ic">💾</span><span class="dr-tx"><b>النسخ الاحتياطي</b><small id="ds-backup">—</small></span><svg class="dr-chev" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
 <button class="dr-item" onclick="drawerGo('export')"><span class="dr-ic">📤</span><span class="dr-tx"><b>تصدير CSV / Excel</b><small id="ds-export">عمليات أو ملخص الكاشيرات</small></span><svg class="dr-chev" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
@@ -1134,6 +1185,21 @@
 </div>
   </div>
 </aside>
+
+
+<!-- Opening balance wizard -->
+<div class="overlay" id="openingOverlay">
+  <div class="sheet">
+    <h3>🏁 الرصيد الافتتاحي</h3>
+    <div class="wz-dots" id="obDots"></div>
+    <div id="obBody" class="wz-body"></div>
+    <div class="btn-row" style="margin-top:14px;">
+      <button class="btn-secondary" id="obPrev" onclick="obPrev()">السابق</button>
+      <button class="btn-primary" id="obNext" onclick="obNext()">التالي</button>
+    </div>
+    <button class="btn-secondary" style="margin-top:8px;" onclick="closeSheet('openingOverlay')">إغلاق</button>
+  </div>
+</div>
 
 <!-- Month close wizard -->
 <div class="overlay" id="monthWizardOverlay">
@@ -1424,6 +1490,7 @@
           <button type="button" id="fundingSrcCash" class="sel" onclick="setFundingPaySource('cash')">كاش</button>
           <button type="button" id="fundingSrcSham" onclick="setFundingPaySource('shamcash')">شام كاش</button>
           <button type="button" id="fundingSrcPending" onclick="setFundingPaySource('pending')">معلّق</button>
+          <button type="button" id="fundingSrcSplit" onclick="setFundingPaySource('split')">موزّع</button>
           <button type="button" id="fundingSrcExt" onclick="setFundingPaySource('external')">مموّل خارجي</button>
         </div>
       </div>
@@ -1433,6 +1500,13 @@
         <p style="font-size:12.5px;color:var(--ink-soft);margin-top:6px;" id="fundingFeePreview"></p>
       </div>
       <p id="fundingPendingHint" style="display:none;font-size:12.5px;color:var(--rust);margin:-4px 0 12px;">المنصة بتنشحن هلأ بالمبلغ الواصل، والمبلغ المدفوع بيضل دين عليك لحد ما تسدده (كاش أو شام كاش) من زر التسديد.</p>
+      <div id="fundingSplitBox" style="display:none;margin-bottom:12px;">
+        <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 8px;line-height:1.7;">وزّع المبلغ المستحق على طرق الدفع. أي جزء ما وزّعته بيضل ديناً عليك.</p>
+        <div class="field"><label>من الكاش (ل.س)</label><input type="number" id="fundingSplitCash" class="mono" placeholder="0" oninput="updateFundingSplitSummary()"></div>
+        <div class="field"><label>من شام كاش (ل.س)</label><input type="number" id="fundingSplitSham" class="mono" placeholder="0" oninput="updateFundingSplitSummary()"></div>
+        <div class="field"><label>مدفوع بطريقة غير محددة — أحدّدها لاحقاً (ل.س)</label><input type="number" id="fundingSplitUnspec" class="mono" placeholder="0" oninput="updateFundingSplitSummary()"></div>
+        <p id="fundingSplitSummary" style="font-size:13px;margin:0;"></p>
+      </div>
       <div id="fundingDebtBox" style="display:none;margin-bottom:12px;">
         <p id="fundingDebtInfo" style="font-size:13px;margin-bottom:8px;"></p>
         <button type="button" class="btn-primary" onclick="openFundingPaySheet(editingFundingId)">💵 تسديد دفعة</button>
@@ -1470,16 +1544,11 @@
   <div class="sheet">
     <h3>تسديد شحن المنصة</h3>
     <p id="fundingPayInfo" style="font-size:13px;color:var(--ink-soft);margin-bottom:12px;"></p>
-    <div class="field">
-      <label>ادفع من</label>
-      <div class="seg seg-sm">
-        <button type="button" id="fundingPayCash" class="sel" onclick="setFundingPayMethod('cash')">الكاش</button>
-        <button type="button" id="fundingPaySham" onclick="setFundingPayMethod('shamcash')">شام كاش</button>
-      </div>
-    </div>
-    <div class="field">
-      <label>المبلغ (ل.س)</label>
-      <input type="number" id="fundingPayAmount" class="mono" placeholder="0">
+    <div id="fundingPayFields">
+      <div class="field"><label>من الكاش (ل.س)</label><div style="display:flex;gap:8px;align-items:center;"><input type="number" id="fundingPayAmount" class="mono" placeholder="0" oninput="updateFundingPaySummary()" style="flex:1;min-width:0;"><button type="button" class="btn-secondary" style="width:auto;margin:0;padding:10px 14px;" onclick="fundingPayFill('cash')">الباقي</button></div></div>
+      <div class="field"><label>من شام كاش (ل.س)</label><div style="display:flex;gap:8px;align-items:center;"><input type="number" id="fundingPayShamAmt" class="mono" placeholder="0" oninput="updateFundingPaySummary()" style="flex:1;min-width:0;"><button type="button" class="btn-secondary" style="width:auto;margin:0;padding:10px 14px;" onclick="fundingPayFill('sham')">الباقي</button></div></div>
+      <div class="field"><label>غير محددة — أحدّد طريقتها لاحقاً (ل.س)</label><div style="display:flex;gap:8px;align-items:center;"><input type="number" id="fundingPayUnspecAmt" class="mono" placeholder="0" oninput="updateFundingPaySummary()" style="flex:1;min-width:0;"><button type="button" class="btn-secondary" style="width:auto;margin:0;padding:10px 14px;" onclick="fundingPayFill('unspec')">الباقي</button></div></div>
+      <p id="fundingPaySummary" style="font-size:13px;margin:0 0 10px;"></p>
     </div>
     <div class="field">
       <label>التاريخ</label>
@@ -1488,6 +1557,19 @@
     <div id="fundingPayHistory" style="margin-bottom:10px;"></div>
     <button class="btn-primary" onclick="saveFundingPay()">تسجيل التسديد</button>
     <button class="btn-secondary" onclick="closeSheet('fundingPayOverlay')">إغلاق</button>
+  </div>
+</div>
+
+
+<div class="overlay" id="fundingSpecOverlay">
+  <div class="sheet">
+    <h3>تحديد طريقة التسديد</h3>
+    <p id="fundingSpecInfo" style="font-size:13px;color:var(--ink-soft);margin-bottom:12px;line-height:1.7;"></p>
+    <div class="field"><label>من الكاش (ل.س)</label><input type="number" id="fundingSpecCash" class="mono" placeholder="0" oninput="updateFundingSpecSummary()"></div>
+    <div class="field"><label>من شام كاش (ل.س)</label><input type="number" id="fundingSpecSham" class="mono" placeholder="0" oninput="updateFundingSpecSummary()"></div>
+    <p id="fundingSpecSummary" style="font-size:13px;margin:0 0 10px;"></p>
+    <button class="btn-primary" onclick="saveFundingSpec()">تثبيت الطريقة</button>
+    <button class="btn-secondary" onclick="closeSheet('fundingSpecOverlay')">إلغاء</button>
   </div>
 </div>
 
@@ -1814,7 +1896,7 @@ async function onLoggedIn(user){
   const hasPinLock = !!localStorage.getItem(PIN_STORAGE_KEY);
   if(hasPinLock){ document.getElementById('pinLockOverlay').classList.add('show'); }
   renderAll();
-  syncPrivacyUI(); syncDrawerState(); armIdle();
+  syncPrivacyUI(); syncDrawerState(); armIdle(); undoReset();
   renderAutoBackupUI();
   dataReadyForBackup = true;
   setTimeout(autoBackupTick, 2000);
@@ -1996,7 +2078,7 @@ function monthTotals(monthStr){
   // دخل الشهر = كل ما شحنته للكاشيرات بهالشهر (حتى لو لسا معلّق، وبغض النظر عن تاريخ السداد) − الأرباح الممرّرة
   let charged=0, pending=0, payouts=0;
   data.transactions.forEach(t=>{
-    if(!t.date || !t.date.startsWith(monthStr)) return;
+    if(t.opening || !t.date || !t.date.startsWith(monthStr)) return;
     if(t.type==='charge'){
       charged += t.amount;
       pending += remainingOf(t);
@@ -2082,6 +2164,7 @@ function txnRowHTML(t, withCashierName){
   const sign = isCharge ? '+' : '↪';
   let badges = '';
   if(isCharge){
+    if(t.opening) badges += '<span class="badge method">🏁 دين سابق</span>';
     badges += `<span class="badge ${chargeStatusClass(t)}">${chargeStatusLabel(t)}</span>`;
     badges += `<span class="badge method">${labelMethod(t.method)}</span>`;
     if(t.status==='partial'){
@@ -2153,7 +2236,7 @@ function renderRecent(){
   const shown = list.slice(0, limit);
   if(mode==='last'){ sum.textContent = ''; }
   else {
-    const charged = list.filter(t=>t.type==='charge').reduce((s,t)=>s+t.amount,0);
+    const charged = list.filter(t=>t.type==='charge' && !t.opening).reduce((s,t)=>s+t.amount,0);
     const payouts = list.filter(t=>t.type==='payout').reduce((s,t)=>s+t.amount,0);
     sum.textContent = `${total} عملية — شحن ${fmt(charged)} — أرباح ممرّرة ${fmt(payouts)}`;
   }
@@ -2171,7 +2254,7 @@ function renderCashiers(){
   el.innerHTML = sorted.map(c=>{
     const txns = data.transactions.filter(t=>t.cashierId===c.id);
     const curMonth = localMonthStr(new Date());
-    const paid = txns.filter(t=>t.type==='charge' && t.date && t.date.startsWith(curMonth)).reduce((s,t)=>s+t.amount,0);  // شحن هالشهر فقط
+    const paid = txns.filter(t=>t.type==='charge' && !t.opening && t.date && t.date.startsWith(curMonth)).reduce((s,t)=>s+t.amount,0);  // شحن هالشهر فقط
     const pending = txns.filter(t=>t.type==='charge').reduce((s,t)=>s+remainingOf(t),0);
     const suspendedBadge = c.status==='suspended' ? '<span class="badge pending">موقوف</span> ' : '';
     return `<div class="row" onclick="openCashierDetail('${c.id}')" style="cursor:pointer; ${c.status==='suspended'?'opacity:.6;':''}">
@@ -2189,6 +2272,7 @@ function reportRowHTML(t, num){
   const amountClass = isCharge ? chargeStatusClass(t) : '';
   let badges = '';
   if(isCharge){
+    if(t.opening) badges += '<span class="badge method">🏁 دين سابق</span>';
     badges += `<span class="badge ${chargeStatusClass(t)}">${chargeStatusLabel(t)}</span>`;
     badges += `<span class="badge method">${labelMethod(t.method)}</span>`;
     if(t.status==='partial'){
@@ -2218,7 +2302,7 @@ function openCashierDetail(id, monthStr){
     ? `تقرير: ${c.name} — ${monthStr}`
     : 'تقرير: ' + c.name;
   let txns = data.transactions.filter(t=>t.cashierId===id);
-  if(monthStr){ txns = txns.filter(t=> t.date && t.date.startsWith(monthStr)); }
+  if(monthStr){ txns = txns.filter(t=> !t.opening && t.date && t.date.startsWith(monthStr)); }
   txns = txns.sort((a,b)=> sortKey(a).localeCompare(sortKey(b)));
 
   const deleteBtn = document.querySelector('#view-cashiers button[onclick="deleteCashier()"]');
@@ -2239,7 +2323,7 @@ function openCashierDetail(id, monthStr){
   const rate = c.commissionRate || 0;
   const commission = net * rate / 100;
 
-  const chargedThisMonth = monthStr ? 0 : txns.filter(t=>t.type==='charge' && t.date && t.date.startsWith(localMonthStr(new Date()))).reduce((s,t)=>s+t.amount,0);
+  const chargedThisMonth = monthStr ? 0 : txns.filter(t=>t.type==='charge' && !t.opening && t.date && t.date.startsWith(localMonthStr(new Date()))).reduce((s,t)=>s+t.amount,0);
   const summaryHTML = (monthStr ? '' : `
     <div class="stat-row" style="margin:0 0 8px;">
       <div class="stat" style="background:var(--paper-raised); border:1px solid var(--line);">
@@ -2314,7 +2398,7 @@ function renderReport(){
   renderReportChart(monthStr);
   renderBackupReminder();
   let rows = data.cashiers.map(c=>{
-    const txns = data.transactions.filter(t=>t.cashierId===c.id && t.date && t.date.startsWith(monthStr));
+    const txns = data.transactions.filter(t=>t.cashierId===c.id && !t.opening && t.date && t.date.startsWith(monthStr));
     const charged = txns.filter(t=>t.type==='charge').reduce((s,t)=>s+t.amount,0);
     const paid = txns.filter(t=>t.type==='charge').reduce((s,t)=>s+paidAmountOf(t),0);
     const pending = txns.filter(t=>t.type==='charge').reduce((s,t)=>s+remainingOf(t),0);
@@ -2520,11 +2604,11 @@ function trendSVG(uid){
   });
   let path = `M ${pts[0][0]} ${pts[0][1]}`;
   for(let i=1;i<pts.length;i++){ const mx=(pts[i-1][0]+pts[i][0])/2; path += ` C ${mx} ${pts[i-1][1]}, ${mx} ${pts[i][1]}, ${pts[i][0]} ${pts[i][1]}`; }
-  const dots = pts.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="#fff" stroke="#22D3EE" stroke-width="2"></circle>`).join('');
+  const dots = pts.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="#fff" stroke="#E3C07C" stroke-width="2"></circle>`).join('');
   const grid = [0.33,0.66,1].map(f=>`<line x1="0" x2="${w}" y1="${base-(base-top)*f}" y2="${base-(base-top)*f}" stroke="rgba(255,255,255,.06)" stroke-dasharray="3 5"></line>`).join('');
   return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block;overflow:visible;">
     <defs>
-      <linearGradient id="bg${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#22D3EE"/><stop offset="1" stop-color="#7C5CFF"/></linearGradient>
+      <linearGradient id="bg${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#EBCB8A"/><stop offset="1" stop-color="#8E6A2C"/></linearGradient>
       <filter id="gl${uid}"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
     </defs>${grid}${bars}
     <path class="line-draw" d="${path}" fill="none" stroke="#FBBF24" stroke-width="2.4" stroke-linecap="round" filter="url(#gl${uid})"></path>${dots}</svg>`;
@@ -2541,9 +2625,9 @@ function renderWalletChart(){
   if(!el) return;
   const t = getWalletTotals();
   const items = [
-    { n:'الكاش', v:t.cashBalance, c:'#FBBF24' },
-    { n:'شام كاش', v:t.shamBalance, c:'#22D3EE' },
-    { n:'المنصة', v:t.platformBalance, c:'#8B7CFF' }
+    { n:'الكاش', v:t.cashBalance, c:'#E3C07C' },
+    { n:'شام كاش', v:t.shamBalance, c:'#C98E5A' },
+    { n:'المنصة', v:t.platformBalance, c:'#9C9588' }
   ];
   const pos = items.map(i=>({...i, p:Math.max(0,i.v)}));
   const total = pos.reduce((s,i)=>s+i.p,0);
@@ -2576,7 +2660,7 @@ function renderReportChart(monthStr){
   const el = document.getElementById('reportChart');
   if(!el) return;
   let rows = data.cashiers.map(c=>{
-    const txns = data.transactions.filter(t=>t.cashierId===c.id && t.date && t.date.startsWith(monthStr));
+    const txns = data.transactions.filter(t=>t.cashierId===c.id && !t.opening && t.date && t.date.startsWith(monthStr));
     return { name:c.name, charged: txns.filter(t=>t.type==='charge').reduce((s,t)=>s+t.amount,0), payouts: txns.filter(t=>t.type==='payout').reduce((s,t)=>s+t.amount,0) };
   }).filter(r=>r.charged>0 || r.payouts>0).sort((a,b)=>b.charged-a.charged).slice(0,7);
   if(rows.length===0){ el.style.display='none'; return; }
@@ -2586,7 +2670,7 @@ function renderReportChart(monthStr){
     rows.map((r,i)=>`<div class="hbar"><span class="hn">${escapeHTML(r.name)}</span>
       <div class="hb"><i class="c" style="width:${Math.max(3,r.charged/max*100)}%;animation-delay:${i*0.07}s"></i>${r.payouts>0 ? `<i class="p" style="width:${Math.max(3,r.payouts/max*100)}%;animation-delay:${i*0.07+0.1}s"></i>` : ''}</div>
       <span class="hv">${shortNum(r.charged)}</span></div>`).join('') +
-    `<div class="legend"><span style="--c:#22D3EE">شحن</span><span style="--c:#FB7185">أرباح ممرّرة</span></div>`;
+    `<div class="legend"><span style="--c:#E3C07C">شحن</span><span style="--c:#FB7185">أرباح ممرّرة</span></div>`;
 }
 
 // عدّاد متحرّك للأرقام الكبيرة بالترويسة: من القيمة السابقة للجديدة
@@ -2616,7 +2700,7 @@ renderAll = function(){ _renderAllBase(); renderWalletChart(); animateHeaderNumb
 function printMonthlyReport(){
   const monthStr = document.getElementById('reportMonth').value;
   const rows = data.cashiers.map(c=>{
-    const txns = data.transactions.filter(t=>t.cashierId===c.id && t.date && t.date.startsWith(monthStr));
+    const txns = data.transactions.filter(t=>t.cashierId===c.id && !t.opening && t.date && t.date.startsWith(monthStr));
     const charged = txns.filter(t=>t.type==='charge').reduce((s,t)=>s+t.amount,0);
     const paid = txns.filter(t=>t.type==='charge').reduce((s,t)=>s+paidAmountOf(t),0);
     const pending = txns.filter(t=>t.type==='charge').reduce((s,t)=>s+remainingOf(t),0);
@@ -2835,7 +2919,7 @@ function renderQuickSearch(){
 function repeatLastTxn(){
   const c = data.cashiers.find(c=>c.id===openCashierId);
   if(!c) return;
-  const txns = data.transactions.filter(t=>t.cashierId===openCashierId).sort((a,b)=>sortKey(a).localeCompare(sortKey(b)));
+  const txns = data.transactions.filter(t=>t.cashierId===openCashierId && !t.opening).sort((a,b)=>sortKey(a).localeCompare(sortKey(b)));
   const last = txns[txns.length-1];
   if(!last){ showToast('ما في عمليات سابقة لهذا الكاشير'); return; }
 
@@ -2931,7 +3015,8 @@ function getWalletTotals(){
   const cashBalance = paidCash - payoutCash + walletDelta.cash + fundingCash + platformCash - withdrawCash - fundPaidCash + compCash;
   const shamBalance = paidSham - payoutSham + walletDelta.shamcash + fundingSham + platformSham - chargeFundedSham - withdrawSham - fundPaidSham + compSham;
   const platformBalance = walletDelta.platform + fundingPlatform + platformPlatform - chargeFundedPlatform - withdrawPlatform + paidPlatform - payoutPlatform + compPlatform;
-  return { cashBalance, shamBalance, platformBalance };
+  const _ob = data.openingBalances || {};
+  return { cashBalance: cashBalance + (Number(_ob.cash)||0), shamBalance: shamBalance + (Number(_ob.shamcash)||0), platformBalance: platformBalance + (Number(_ob.platform)||0) };
 }
 // إجمالي عمولة التحويلات (المبلغ يلي حوّلته ناقص يلي وصل فعليًا) عبر كل سجلات التحويل — رقم منفصل وواضح، مش مدمج بصمت جوا مجموع المحافظ
 function getFeeCompTotal(){ return (data.feeCompensations||[]).reduce((s,x)=>s+x.amount,0); }
@@ -3835,13 +3920,14 @@ function walletEvents(){
   });
   (data.walletFunding||[]).forEach(x=>{
     add(x.destination, x.amount, 'تمويل خارجي', x.date);
-    fundingPaymentsOf(x).forEach(pm=> add(pm.method, -pm.amount, 'دفع ثمن شحن المنصة', pm.date||x.date));
+    fundingPaymentsOf(x).filter(pm=>pm.method==='cash'||pm.method==='shamcash').forEach(pm=> add(pm.method, -pm.amount, 'دفع ثمن شحن المنصة', pm.date||x.date));
   });
   (data.platformPayins||[]).forEach(x=>{
     add(x.destination, x.amount, x.smartId ? 'دفعة منصة (مرافقة لتمرير ربح كاشير)' : 'دفعة من المنصة (ربح لاعبين)', x.date);
   });
   (data.externalWithdrawals||[]).forEach(x=> add(x.source, -x.amount, 'سحب خارجي', x.date));
   (data.feeCompensations||[]).forEach(x=> add(x.wallet, x.amount, 'تعويض عمولة', x.date));
+  if(data.openingBalances){ const ob_ = data.openingBalances; ['cash','shamcash','platform'].forEach(w=> add(w, Number(ob_[w])||0, 'رصيد افتتاحي', ob_.date)); }
   return ev;
 }
 function setAuditRange(kind){
@@ -3891,7 +3977,7 @@ function renderAudit(){
 
   // الكاشيرات والأرباح بالفترة
   const inRange = d => d && d >= from && d <= to;
-  const charges = data.transactions.filter(t=>t.type==='charge' && inRange(t.date));
+  const charges = data.transactions.filter(t=>t.type==='charge' && !t.opening && inRange(t.date));
   const chargedSum = charges.reduce((s,t)=>s+t.amount,0);
   const payoutsTx = data.transactions.filter(t=>t.type==='payout' && inRange(t.date));
   const payoutsSum = payoutsTx.reduce((s,t)=>s+t.amount,0);
@@ -4413,7 +4499,7 @@ function openTxnDetail(id){
   if(!t) return;
   const isCharge = t.type==='charge';
   let rows = [];
-  rows.push(['النوع', isCharge ? 'شحن كاشير' : 'تمرير ربح لاعب']);
+  rows.push(['النوع', t.opening ? 'دين سابق (رصيد افتتاحي)' : (isCharge ? 'شحن كاشير' : 'تمرير ربح لاعب')]);
   rows.push(['الكاشير', cashierName(t.cashierId)]);
   rows.push(['المبلغ', fmt(t.amount) + ' ل.س']);
   if(t.originalCurrency==='USD'){
@@ -4422,7 +4508,7 @@ function openTxnDetail(id){
   rows.push(['التاريخ والساعة', fmtDT(t)]);
   if(isCharge){
     rows.push(['طريقة القبض', labelMethod(t.method)]);
-    rows.push(['تمويل الشحن', t.fundingSource==='shamcash' ? 'من شام كاش محفظتي' : 'عبر المنصة مباشرة']);
+    rows.push(['تمويل الشحن', t.opening ? 'لا يوجد — قيد افتتاحي (ما انخصم من أي محفظة)' : (t.fundingSource==='shamcash' ? 'من شام كاش محفظتي' : 'عبر المنصة مباشرة')]);
     rows.push(['الحالة', chargeStatusLabel(t)]);
     if(t.status==='partial'){
       rows.push(['المسدد لحد هلق', fmt(paidAmountOf(t)) + ' ل.س']);
@@ -4642,6 +4728,7 @@ let editingTxnId = null;
 function editFromDetail(){
   const t = data.transactions.find(x=>x.id===detailTxnId);
   if(!t) return;
+  if(t.opening){ showToast('عدّل الدين السابق من القائمة ← رصيد افتتاحي'); return; }
   if(t.smartId){ showToast('هذه العملية مرتبطة بتسديد دين — احذفها وأعد إدخالها'); return; }
   if(isMonthLocked((t.date||'').slice(0,7))){ showToast('هذا الشهر مقفول، افتح القفل من صفحة التقرير الأول'); return; }
   editingTxnId = t.id;
@@ -5583,6 +5670,470 @@ function renderAbout(){
 applyFontScale();
 applyHomeLayout();
 renderHomeLayoutPage();
+</script>
+<script>
+// =====================================================================
+//  1) التراجع / التقدّم (Undo / Redo)
+// =====================================================================
+const UNDO_MAX = 40;
+const UNDO_VOLATILE = ['log','lastBackupAt','lockedMonths'];   // لا تدخل بالتراجع
+let undoStack = [], redoStack = [], undoBase = null, undoPendingLabel = '', undoApplying = false;
+
+function undoKey(obj){
+  const o = Object.assign({}, obj);
+  UNDO_VOLATILE.forEach(k=> delete o[k]);
+  return JSON.stringify(o);
+}
+function undoReset(){
+  undoStack = []; redoStack = []; undoPendingLabel = '';
+  undoBase = undoKey(data);
+  syncUndoUI();
+}
+function syncUndoUI(){
+  const u = document.getElementById('undoBtn'), r = document.getElementById('redoBtn');
+  if(!u || !r) return;
+  u.disabled = undoStack.length === 0;
+  r.disabled = redoStack.length === 0;
+  u.title = undoStack.length ? ('تراجع عن: ' + undoStack[undoStack.length-1].label) : 'لا يوجد ما يُتراجع عنه';
+  r.title = redoStack.length ? ('تقدّم إلى: ' + redoStack[redoStack.length-1].label) : 'لا يوجد ما يُعاد';
+}
+// تسجيل اسم آخر حركة لتظهر برسالة التراجع
+(function(){
+  const baseLog = window.logActivity;
+  window.logActivity = function(action, detail){
+    undoPendingLabel = String(action||'') + (detail ? ' — ' + detail : '');
+    return baseLog.apply(this, arguments);
+  };
+  const baseSave = window.saveData;
+  window.saveData = function(){
+    if(!undoApplying && undoBase !== null){
+      const k = undoKey(data);
+      if(k !== undoBase){
+        undoStack.push({ snap: undoBase, label: (undoPendingLabel || 'تعديل').slice(0,70) });
+        if(undoStack.length > UNDO_MAX) undoStack.shift();
+        redoStack = [];
+        undoBase = k;
+      }
+    }
+    undoPendingLabel = '';
+    syncUndoUI();
+    return baseSave.apply(this, arguments);
+  };
+})();
+function txnChangesTouchLockedMonth(curObj, target){
+  const locked = data.lockedMonths || [];
+  if(!locked.length) return false;
+  const a = new Map((curObj.transactions||[]).map(t=>[t.id, JSON.stringify(t)]));
+  const b = new Map((target.transactions||[]).map(t=>[t.id, JSON.stringify(t)]));
+  const ids = new Set([...a.keys(), ...b.keys()]);
+  for(const id of ids){
+    if(a.get(id) === b.get(id)) continue;
+    const t = JSON.parse(a.get(id) || b.get(id));
+    if(t.date && locked.includes(t.date.slice(0,7))) return true;
+  }
+  return false;
+}
+function undoApply(dir){
+  const from = dir < 0 ? undoStack : redoStack, to = dir < 0 ? redoStack : undoStack;
+  if(!from.length) return;
+  const step = from[from.length-1];
+  const target = JSON.parse(step.snap);
+  const curObj = JSON.parse(undoBase);
+  if(txnChangesTouchLockedMonth(curObj, target)){
+    showToast('ما فيك ' + (dir<0?'تتراجع':'تتقدّم') + ': الخطوة بتمس عمليات بشهر مقفول'); return;
+  }
+  from.pop();
+  to.push({ snap: undoBase, label: step.label });
+  const keepLog = data.log, keepBackup = data.lastBackupAt, keepLocked = data.lockedMonths;
+  undoApplying = true;
+  try{
+    data = target;
+    data.log = keepLog || [];
+    if(keepBackup !== undefined) data.lastBackupAt = keepBackup;
+    if(keepLocked !== undefined) data.lockedMonths = keepLocked;
+    ['cashiers','transactions'].forEach(k=>{ if(!Array.isArray(data[k])) data[k] = []; });
+    undoBase = undoKey(data);
+    logActivity(dir<0 ? 'تراجع' : 'تقدّم', step.label);
+    saveData();
+    renderAll();
+    syncDrawerState();
+  } finally { undoApplying = false; undoPendingLabel = ''; }
+  syncUndoUI();
+  showToast((dir<0 ? '↶ تراجعت عن: ' : '↷ أعدت: ') + (step.label.length>46 ? step.label.slice(0,46)+'…' : step.label));
+}
+function undoStep(){ undoApply(-1); }
+function redoStep(){ undoApply(1); }
+document.addEventListener('keydown', e=>{
+  if(!(e.ctrlKey || e.metaKey)) return;
+  const tag = (e.target && e.target.tagName) || '';
+  if(/INPUT|TEXTAREA|SELECT/.test(tag)) return;
+  if(e.key === 'z' || e.key === 'Z'){ e.preventDefault(); e.shiftKey ? redoStep() : undoStep(); }
+  else if(e.key === 'y' || e.key === 'Y'){ e.preventDefault(); redoStep(); }
+});
+
+// =====================================================================
+//  2) التمويل: توزيع على أكثر من طريقة + جزء "غير محدد الطريقة"
+// =====================================================================
+function fundingUnspecTotal(x){ return fundingPaymentsOf(x).filter(pm=>pm.method==='unspecified').reduce((s,pm)=>s+pm.amount,0); }
+function fundingMethodLabel(m){ return m==='cash' ? 'كاش' : (m==='shamcash' ? 'شام كاش' : 'غير محددة ⏳'); }
+const numVal = id => Math.max(0, Number(document.getElementById(id).value) || 0);
+
+// --- إنشاء تمويل بدفعات موزّعة
+(function(){
+  const baseRefresh = window.refreshFundingPlatformUI;
+  window.refreshFundingPlatformUI = function(){
+    baseRefresh.apply(this, arguments);
+    const split = fundingDestination === 'platform' && fundingPaySource === 'split';
+    document.getElementById('fundingSplitBox').style.display = split ? 'block' : 'none';
+    document.getElementById('fundingSrcSplit').classList.toggle('sel', split);
+    if(split){
+      document.getElementById('fundingAmountLabel').textContent = 'إجمالي المبلغ المستحق للمموّل (ل.س)';
+      document.getElementById('fundingPendingHint').style.display = 'none';
+      updateFundingSplitSummary();
+    }
+  };
+  const baseOpen = window.openFundingSheet;
+  window.openFundingSheet = function(id){
+    baseOpen.apply(this, arguments);
+    document.getElementById('fundingSrcSplit').style.display = id ? 'none' : '';
+    ['fundingSplitCash','fundingSplitSham','fundingSplitUnspec'].forEach(i=> document.getElementById(i).value = '');
+  };
+  const baseSaveFunding = window.saveFunding;
+  window.saveFunding = function(){
+    if(!(fundingDestination === 'platform' && fundingPaySource === 'split' && !editingFundingId)) return baseSaveFunding.apply(this, arguments);
+    const total = Number(document.getElementById('fundingAmount').value);
+    if(!total || total <= 0){ showToast('أدخل إجمالي المبلغ المستحق'); return; }
+    const date = document.getElementById('fundingDate').value || todayISO();
+    if(date > todayISO()){ showToast('التاريخ ما لازم يكون بالمستقبل'); return; }
+    let recv = Number(document.getElementById('fundingReceived').value);
+    if(!recv || recv <= 0) recv = total;
+    if(recv > total){ showToast('المبلغ الواصل ما ممكن يكون أكبر من المستحق'); return; }
+    const cash = numVal('fundingSplitCash'), sham = numVal('fundingSplitSham'), unspec = numVal('fundingSplitUnspec');
+    const sum = cash + sham + unspec;
+    if(sum > total){ showToast('مجموع الدفعات (' + fmt(sum) + ') أكبر من المستحق (' + fmt(total) + ')'); return; }
+    const note = document.getElementById('fundingNote').value.trim();
+    const t = nowTime(); const payments = [];
+    if(cash > 0)   payments.push({ id: uid(), amount: cash,   method: 'cash',        date, time: t });
+    if(sham > 0)   payments.push({ id: uid(), amount: sham,   method: 'shamcash',    date, time: t });
+    if(unspec > 0) payments.push({ id: uid(), amount: unspec, method: 'unspecified', date, time: t });
+    if(!data.walletFunding) data.walletFunding = [];
+    const f = { id: uid(), amount: recv, destination: 'platform', date, time: t, note, paySource: 'pending', paidAmount: total, fee: total - recv, payments };
+    data.walletFunding.push(f);
+    const parts = [];
+    if(cash) parts.push('كاش ' + fmt(cash)); if(sham) parts.push('شام ' + fmt(sham)); if(unspec) parts.push('غير محدد ' + fmt(unspec));
+    logActivity('تمويل من المموّل الرئيسي', 'المنصة — ' + fmt(recv) + ' ل.س (مستحق ' + fmt(total) + (parts.length ? ' — دفعت: ' + parts.join(' + ') : '') + ')', { k:'funding', id: f.id });
+    saveData(); closeSheet('fundingOverlay'); renderAll(); showToast('تم تسجيل التمويل');
+  };
+})();
+function updateFundingSplitSummary(){
+  const el = document.getElementById('fundingSplitSummary'); if(!el) return;
+  const total = Number(document.getElementById('fundingAmount').value) || 0;
+  const sum = numVal('fundingSplitCash') + numVal('fundingSplitSham') + numVal('fundingSplitUnspec');
+  if(!total){ el.textContent = ''; return; }
+  const left = total - sum;
+  el.style.color = left < 0 ? 'var(--rust)' : 'var(--ink-soft)';
+  el.textContent = left < 0 ? ('⚠️ الدفعات أكبر من المستحق بـ ' + fmt(-left)) : ('الموزّع ' + fmt(sum) + ' — الباقي دين عليك ' + fmt(left));
+}
+// تحديث الملخّص لما يتغيّر إجمالي المبلغ
+document.addEventListener('input', e=>{ if(e.target && e.target.id === 'fundingAmount') updateFundingSplitSummary(); });
+
+// --- شاشة تسديد التمويل (عدة طرق دفعة وحدة)
+window.setFundingPayMethod = function(){};
+function updateFundingPaySummary(){
+  const f = (data.walletFunding||[]).find(x=>x.id===payingFundingId);
+  const el = document.getElementById('fundingPaySummary'); if(!f || !el) return;
+  const owed = fundingOwed(f);
+  const sum = numVal('fundingPayAmount') + numVal('fundingPayShamAmt') + numVal('fundingPayUnspecAmt');
+  el.style.color = sum > owed ? 'var(--rust)' : 'var(--ink-soft)';
+  el.textContent = sum > owed ? ('⚠️ المجموع أكبر من المتبقي بـ ' + fmt(sum-owed)) : ('المجموع ' + fmt(sum) + ' — يبقى دين ' + fmt(owed - sum));
+}
+function fundingPayFill(which){
+  const f = (data.walletFunding||[]).find(x=>x.id===payingFundingId); if(!f) return;
+  const ids = { cash:'fundingPayAmount', sham:'fundingPayShamAmt', unspec:'fundingPayUnspecAmt' };
+  const others = Object.keys(ids).filter(k=>k!==which).reduce((s,k)=> s + numVal(ids[k]), 0);
+  document.getElementById(ids[which]).value = Math.max(0, fundingOwed(f) - others) || '';
+  updateFundingPaySummary();
+}
+window.renderFundingPaySheet = function(){
+  const f = (data.walletFunding||[]).find(x=>x.id===payingFundingId);
+  if(!f) return;
+  const owed = fundingOwed(f);
+  document.getElementById('fundingPayFields').style.display = '';
+  document.getElementById('fundingPayInfo').textContent = `المستحق ${fmt(f.paidAmount)} ل.س — انسدد ${fmt(fundingPaidTotal(f))} — الباقي ${fmt(owed)}`;
+  ['fundingPayAmount','fundingPayShamAmt','fundingPayUnspecAmt'].forEach(i=> document.getElementById(i).value = '');
+  const pays = Array.isArray(f.payments) ? f.payments : [];
+  document.getElementById('fundingPayHistory').innerHTML = pays.length
+    ? '<p style="font-size:12.5px;color:var(--ink-soft);margin-bottom:6px;">التسديدات السابقة:</p>' + pays.map(pm=>
+        `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;padding:6px 0;border-bottom:1px solid var(--line);">
+          <span>${fmtDT(pm)} · ${fundingMethodLabel(pm.method)} · <span class="mono">${fmt(pm.amount)}</span></span>
+          <span style="display:flex;gap:10px;">
+            ${pm.id && pm.method==='unspecified' ? `<button type="button" style="color:var(--brass);background:none;border:none;font-size:13px;font-weight:600;" onclick="openFundingSpec('${f.id}','${pm.id}')">حدّد الطريقة</button>` : ''}
+            ${pm.id ? `<button type="button" style="color:var(--rust);background:none;border:none;font-size:13px;" onclick="deleteFundingPayment('${pm.id}')">حذف</button>` : ''}
+          </span>
+        </div>`).join('')
+    : '';
+  updateFundingPaySummary();
+};
+window.saveFundingPay = function(){
+  const f = (data.walletFunding||[]).find(x=>x.id===payingFundingId);
+  if(!f) return;
+  const cash = numVal('fundingPayAmount'), sham = numVal('fundingPayShamAmt'), unspec = numVal('fundingPayUnspecAmt');
+  const sum = cash + sham + unspec, owed = fundingOwed(f);
+  if(sum <= 0){ showToast('أدخل مبلغ صحيح'); return; }
+  if(sum > owed){ showToast('المجموع أكبر من المتبقي عليك (' + fmt(owed) + ')'); return; }
+  const date = document.getElementById('fundingPayDate').value || todayISO();
+  if(date > todayISO()){ showToast('التاريخ ما لازم يكون بالمستقبل'); return; }
+  if(!Array.isArray(f.payments)) f.payments = fundingPaymentsOf(f).map(pm=>({ id: uid(), ...pm, date: f.date }));
+  const t = nowTime();
+  if(cash > 0)   f.payments.push({ id: uid(), amount: cash,   method: 'cash',        date, time: t });
+  if(sham > 0)   f.payments.push({ id: uid(), amount: sham,   method: 'shamcash',    date, time: t });
+  if(unspec > 0) f.payments.push({ id: uid(), amount: unspec, method: 'unspecified', date, time: t });
+  const parts = [];
+  if(cash) parts.push('كاش ' + fmt(cash)); if(sham) parts.push('شام ' + fmt(sham)); if(unspec) parts.push('غير محدد ' + fmt(unspec));
+  logActivity('تسديد شحن منصة', parts.join(' + ') + ' — الباقي ' + fmt(fundingOwed(f)), { k:'funding', id: f.id });
+  saveData(); renderAll();
+  if(fundingOwed(f) > 0 || fundingUnspecTotal(f) > 0){ renderFundingPaySheet(); }
+  else { closeSheet('fundingPayOverlay'); }
+  showToast('تم تسجيل التسديد');
+};
+(function(){
+  const basePicker = window.openPendingFundingPicker;
+  window.openPendingFundingPicker = function(){
+    basePicker.apply(this, arguments);
+    if(payingFundingId === null){ const b = document.getElementById('fundingPayFields'); if(b) b.style.display = 'none'; }
+  };
+})();
+
+// --- تحديد طريقة دفعة "غير محددة"
+let specFundingId = null, specPaymentId = null;
+function openFundingSpec(fid, pid){
+  const f = (data.walletFunding||[]).find(x=>x.id===fid);
+  const pm = f && (f.payments||[]).find(x=>x.id===pid);
+  if(!pm) return;
+  specFundingId = fid; specPaymentId = pid;
+  document.getElementById('fundingSpecInfo').textContent = `دفعة بقيمة ${fmt(pm.amount)} ل.س بتاريخ ${pm.date || f.date}. وزّعها على الطريقة اللي اندفعت فيها فعلياً، وأي جزء بتتركه بيضل "غير محدد".`;
+  document.getElementById('fundingSpecCash').value = '';
+  document.getElementById('fundingSpecSham').value = '';
+  updateFundingSpecSummary();
+  document.getElementById('fundingSpecOverlay').classList.add('show');
+}
+function updateFundingSpecSummary(){
+  const f = (data.walletFunding||[]).find(x=>x.id===specFundingId);
+  const pm = f && (f.payments||[]).find(x=>x.id===specPaymentId);
+  const el = document.getElementById('fundingSpecSummary'); if(!pm || !el) return;
+  const sum = numVal('fundingSpecCash') + numVal('fundingSpecSham');
+  el.style.color = sum > pm.amount ? 'var(--rust)' : 'var(--ink-soft)';
+  el.textContent = sum > pm.amount ? ('⚠️ المجموع أكبر من الدفعة بـ ' + fmt(sum - pm.amount)) : ('يبقى غير محدد ' + fmt(pm.amount - sum));
+}
+function saveFundingSpec(){
+  const f = (data.walletFunding||[]).find(x=>x.id===specFundingId);
+  const pm = f && (f.payments||[]).find(x=>x.id===specPaymentId);
+  if(!pm) return;
+  const cash = numVal('fundingSpecCash'), sham = numVal('fundingSpecSham'), sum = cash + sham;
+  if(sum <= 0){ showToast('أدخل مبلغ صحيح'); return; }
+  if(sum > pm.amount){ showToast('المجموع أكبر من الدفعة'); return; }
+  const rest = pm.amount - sum;
+  if(rest > 0) pm.amount = rest; else f.payments = f.payments.filter(x=>x.id!==pm.id);
+  if(cash > 0) f.payments.push({ id: uid(), amount: cash, method: 'cash',     date: pm.date, time: pm.time });
+  if(sham > 0) f.payments.push({ id: uid(), amount: sham, method: 'shamcash', date: pm.date, time: pm.time });
+  logActivity('تحديد طريقة تسديد تمويل', [cash?('كاش '+fmt(cash)):'', sham?('شام '+fmt(sham)):''].filter(Boolean).join(' + '), { k:'funding', id: f.id });
+  saveData(); renderAll();
+  closeSheet('fundingSpecOverlay');
+  if(document.getElementById('fundingPayOverlay').classList.contains('show')){ payingFundingId = f.id; renderFundingPaySheet(); }
+  showToast('تم تثبيت طريقة التسديد');
+}
+
+// --- بطاقة المستحقات: تشمل التسديدات غير المحددة حتى لو الدفعة انسدّت كاملة
+window.renderFundingPending = function(){
+  const sec = document.getElementById('fundingPendingSection');
+  const list = document.getElementById('fundingPendingList');
+  if(!sec || !list) return;
+  const items = (data.walletFunding||[]).filter(x=> fundingOwed(x)>0 || fundingUnspecTotal(x)>0)
+    .sort((a,b)=> (a.date+(a.time||'')).localeCompare(b.date+(b.time||'')));
+  if(items.length===0){ sec.style.display='none'; list.innerHTML=''; return; }
+  sec.style.display='block';
+  const totalOwed = items.reduce((s,x)=>s+fundingOwed(x),0);
+  const totalUnspec = items.reduce((s,x)=>s+fundingUnspecTotal(x),0);
+  let html = '';
+  if(totalOwed>0) html += `<div class="stat-row" style="margin-bottom:10px;"><div class="stat" style="background:var(--rust-soft);">
+      <p class="k" style="color:var(--rust);">إجمالي المستحق عليك</p>
+      <p class="v mono" style="color:var(--rust);">${fmt(totalOwed)}</p></div></div>`;
+  if(totalUnspec>0) html += `<div class="stat" style="background:var(--brass-soft);margin-bottom:10px;padding:10px 12px;">
+      <p style="margin:0;font-size:13px;color:var(--brass);">⏳ تسديدات غير محددة الطريقة: <span class="mono">${fmt(totalUnspec)}</span> — ما انخصمت من أي محفظة لحد ما تحدّد طريقتها.</p></div>`;
+  html += items.map(x=>{
+    const owed = fundingOwed(x), un = fundingUnspecTotal(x);
+    const paidNote = fundingPaidTotal(x)>0 ? ' · انسدد ' + fmt(fundingPaidTotal(x)) + (un>0 ? ' (منه ' + fmt(un) + ' غير محدد)' : '') : '';
+    return `<div style="margin-bottom:12px;">
+      <div class="row">
+        <div class="main">
+          <p class="name">شحن المنصة — واصل ${fmt(x.amount)}</p>
+          <p class="sub"><span>${fmtDT(x)}</span> · مستحق ${fmt(x.paidAmount)}${paidNote}${x.note ? ' · '+escapeHTML(x.note) : ''}</p>
+        </div>
+        <div class="amount mono pending">${owed>0 ? fmt(owed) : '✓'}</div>
+      </div>
+      <div class="btn-row" style="margin-top:6px;">
+        ${owed>0 ? `<button class="btn-primary" onclick="openFundingPaySheet('${x.id}')">💵 تسديد</button>` : `<button class="btn-primary" onclick="openFundingPaySheet('${x.id}')">🔧 حدّد طريقة التسديد</button>`}
+        <button class="btn-secondary" onclick="openFundingSheet('${x.id}')">✏️ تعديل</button>
+      </div>
+    </div>`;
+  }).join('');
+  list.innerHTML = html;
+};
+
+// =====================================================================
+//  3) الرصيد الافتتاحي (مرحلتين: ديون ← أرصدة المحافظ)
+// =====================================================================
+let obState = { step:0, date:'', debts:[], wallets:{ cash:'', shamcash:'', platform:'' }, existing:false };
+function openOpeningFromDrawer(){ closeDrawer(); setTimeout(openOpening, 260); }
+function openOpening(){
+  const ob0 = data.openingBalances || null;
+  const existing = data.transactions.filter(t=>t.opening);
+  const dates = data.transactions.filter(t=>!t.opening && t.date).map(t=>t.date).sort();
+  const defDate = (dates[0] && dates[0] < todayISO()) ? dates[0] : todayISO();
+  obState = {
+    step: 0, existing: !!ob0 || existing.length>0,
+    date: (ob0 && ob0.date) || defDate,
+    debts: existing.map(t=>({ cashierId: t.cashierId, name: cashierName(t.cashierId), amount: t.amount, paid: paidAmountOf(t) })),
+    wallets: { cash: ob0 ? (ob0.cash||'') : '', shamcash: ob0 ? (ob0.shamcash||'') : '', platform: ob0 ? (ob0.platform||'') : '' }
+  };
+  obRender();
+  document.getElementById('openingOverlay').classList.add('show');
+}
+function obPrev(){ if(obState.step > 0){ obState.step--; obRender(); } }
+function obNext(){
+  if(obState.step === 0){
+    const d = document.getElementById('obDate'); if(d) obState.date = d.value || obState.date;
+    if(obState.date > todayISO()){ showToast('التاريخ ما لازم يكون بالمستقبل'); return; }
+    obState.step = 1; obRender();
+  } else { obSave(); }
+}
+function obAddDebt(){
+  const name = document.getElementById('obName').value.trim();
+  const amount = Number(document.getElementById('obAmt').value);
+  if(!name){ showToast(W('أدخل اسم الكاشير','أدخل اسم اللاعب')); return; }
+  if(!amount || amount <= 0){ showToast('أدخل مبلغ الدين'); return; }
+  const c = data.cashiers.find(c=> c.name.trim().toLowerCase() === name.toLowerCase());
+  const dup = obState.debts.find(d=> (c && d.cashierId === c.id) || (!d.cashierId && d.name.trim().toLowerCase() === name.toLowerCase()));
+  if(dup){ showToast('الاسم موجود، عدّل مبلغه من القائمة'); return; }
+  obState.debts.push({ cashierId: c ? c.id : null, name: c ? c.name : name, amount, paid: 0 });
+  obRender();
+}
+function obRemoveDebt(i){
+  const d = obState.debts[i]; if(!d) return;
+  if(d.paid > 0){ showToast('هذا الدين انسدد منه جزء، ما فيك تحذفه'); return; }
+  obState.debts.splice(i,1); obRender();
+}
+function obSetDebt(i, v){
+  const d = obState.debts[i]; if(!d) return;
+  d.amount = Math.max(0, Number(v) || 0);
+}
+function obSums(){
+  const debts = obState.debts.reduce((s,d)=> s + Math.max(0, (Number(d.amount)||0) - (d.paid||0)), 0);
+  const w = obState.wallets;
+  const wallets = (Number(w.cash)||0) + (Number(w.shamcash)||0) + (Number(w.platform)||0);
+  return { debts, wallets, total: debts + wallets };
+}
+function obUpdateSummary(){
+  const el = document.getElementById('obSummary'); if(!el) return;
+  ['cash','shamcash','platform'].forEach(k=>{ obState.wallets[k] = document.getElementById('obW_'+k).value; });
+  const t = obSums();
+  el.innerHTML = `<div class="wz-row"><span>ديون معلّقة</span><span class="mono">${fmt(t.debts)}</span></div>
+    <div class="wz-row"><span>أرصدة المحافظ</span><span class="mono">${fmt(t.wallets)}</span></div>
+    <div class="wz-row" style="border-bottom:0;"><b>إجمالي رأس المال</b><b class="mono">${fmt(t.total)}</b></div>`;
+}
+function obRender(){
+  document.getElementById('obDots').innerHTML = [0,1].map(i=> `<i class="${i<obState.step?'done':''} ${i===obState.step?'cur':''}"></i>`).join('');
+  const body = document.getElementById('obBody');
+  body.style.animation = 'none'; void body.offsetWidth; body.style.animation = '';
+  const names = data.cashiers.map(c=>`<option value="${escapeHTML(c.name)}"></option>`).join('');
+  if(obState.step === 0){
+    body.innerHTML = `<h4>1 · الديون السابقة</h4>
+      <p>سجّل كل ${W('كاشير','لاعب')} عليه دين قبل بدء استخدام التطبيق. هي ما رح تنخصم من أي محفظة ولا تنحسب دخل شهر البداية.</p>
+      <div class="field"><label>تاريخ البداية</label><input type="date" id="obDate" value="${obState.date}" max="${todayISO()}"></div>
+      <div id="obDebtList">${obState.debts.length ? obState.debts.map((d,i)=>`
+        <div class="wz-row" style="align-items:center;">
+          <span style="flex:1;min-width:0;">${escapeHTML(d.name)}${d.paid>0?`<br><small style="color:var(--ink-soft);">انسدد منه ${fmt(d.paid)}</small>`:''}</span>
+          <input type="number" class="mono" value="${d.amount}" onchange="obSetDebt(${i}, this.value)" style="width:120px;padding:8px 10px;border-radius:12px;border:1px solid var(--line);background:var(--paper-raised);color:var(--ink);">
+          <button type="button" onclick="obRemoveDebt(${i})" style="background:none;border:none;color:var(--rust);font-size:16px;padding:4px 6px;" aria-label="حذف">✕</button>
+        </div>`).join('') : '<p style="margin:6px 0 10px;">ما أضفت أي دين لحد الآن.</p>'}</div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <input list="obNames" id="obName" placeholder="${W('اسم الكاشير','اسم اللاعب')}" style="flex:1.4;min-width:0;padding:11px 12px;border-radius:14px;border:1px solid var(--line);background:var(--paper-raised);color:var(--ink);">
+        <input type="number" id="obAmt" class="mono" placeholder="المبلغ" style="flex:1;min-width:0;padding:11px 12px;border-radius:14px;border:1px solid var(--line);background:var(--paper-raised);color:var(--ink);">
+      </div>
+      <datalist id="obNames">${names}</datalist>
+      <button class="btn-secondary" style="margin-top:8px;" onclick="obAddDebt()">➕ إضافة</button>`;
+  } else {
+    const w = obState.wallets;
+    body.innerHTML = `<h4>2 · أرصدة المحافظ الحالية</h4>
+      <p>اكتب الرصيد الفعلي الموجود بكل محفظة هلأ. بيتسجّل كما هو بدون تغيير.</p>
+      <div class="field"><label>الكاش (ل.س)</label><input type="number" id="obW_cash" class="mono" placeholder="0" value="${w.cash}" oninput="obUpdateSummary()"></div>
+      <div class="field"><label>شام كاش (ل.س)</label><input type="number" id="obW_shamcash" class="mono" placeholder="0" value="${w.shamcash}" oninput="obUpdateSummary()"></div>
+      <div class="field"><label>المنصة (ل.س)</label><input type="number" id="obW_platform" class="mono" placeholder="0" value="${w.platform}" oninput="obUpdateSummary()"></div>
+      <div id="obSummary" style="margin-top:6px;"></div>
+      ${obState.existing ? '<p style="color:var(--brass);margin-top:8px;">⚠️ الرصيد الافتتاحي مسجّل مسبقاً — تعديله بيغيّر أرصدة المحافظ الحالية.</p>' : ''}`;
+    obUpdateSummary();
+  }
+  document.getElementById('obPrev').style.visibility = obState.step === 0 ? 'hidden' : 'visible';
+  document.getElementById('obNext').textContent = obState.step === 0 ? 'التالي' : 'حفظ';
+}
+function obSave(){
+  ['cash','shamcash','platform'].forEach(k=>{ obState.wallets[k] = document.getElementById('obW_'+k).value; });
+  const w = {
+    cash: Math.max(0, Number(obState.wallets.cash)||0),
+    shamcash: Math.max(0, Number(obState.wallets.shamcash)||0),
+    platform: Math.max(0, Number(obState.wallets.platform)||0)
+  };
+  const date = obState.date || todayISO();
+  // التحقق قبل أي تعديل
+  const rows = obState.debts.filter(d=> (Number(d.amount)||0) > 0);
+  const existing = data.transactions.filter(t=>t.opening);
+  for(const d of rows){
+    const t = d.cashierId ? existing.find(x=>x.cashierId===d.cashierId) : null;
+    if(t && d.amount < paidAmountOf(t)){ showToast('دين ' + d.name + ' أقل من المبلغ اللي انسدد منه (' + fmt(paidAmountOf(t)) + ')'); return; }
+  }
+  const keepIds = new Set(rows.filter(d=>d.cashierId).map(d=>d.cashierId));
+  for(const t of existing){
+    if(!keepIds.has(t.cashierId) && paidAmountOf(t) > 0){ showToast('دين ' + cashierName(t.cashierId) + ' انسدد منه جزء، ما فيك تشيله'); return; }
+  }
+  // التطبيق
+  let created = 0;
+  const applied = new Set();
+  rows.forEach(d=>{
+    let cid = d.cashierId;
+    if(!cid){
+      const c = { id: uid(), name: d.name, createdAt: todayISO(), commissionRate: 0 };
+      data.cashiers.push(c); cid = c.id; created++;
+    }
+    applied.add(cid);
+    const t = existing.find(x=>x.cashierId===cid);
+    if(t){
+      t.amount = d.amount; t.date = date;
+      const paid = paidAmountOf(t);
+      t.status = paid >= t.amount ? 'paid' : (paid > 0 ? 'partial' : 'pending');
+    } else {
+      data.transactions.push({ id: uid(), type:'charge', cashierId: cid, amount: d.amount, date, time:'00:00',
+        note:'دين سابق (رصيد افتتاحي)', method:'cash', status:'pending', fundingSource:'none', opening:true });
+    }
+  });
+  data.transactions = data.transactions.filter(t=> !(t.opening && !applied.has(t.cashierId)));
+  data.openingBalances = { date, cash: w.cash, shamcash: w.shamcash, platform: w.platform };
+  const total = obSums();
+  logActivity('رصيد افتتاحي', `ديون ${fmt(total.debts)} + محافظ ${fmt(total.wallets)} = ${fmt(total.total)}` + (created ? ` — أُضيف ${created} ${W('كاشير','لاعب')} جديد` : ''));
+  saveData(); renderAll(); syncDrawerState();
+  closeSheet('openingOverlay');
+  showToast('تم حفظ الرصيد الافتتاحي');
+}
+(function(){
+  const base = window.syncDrawerState;
+  window.syncDrawerState = function(){
+    base.apply(this, arguments);
+    const el = document.getElementById('ds-opening'); if(!el) return;
+    const ob = data.openingBalances;
+    const n = data.transactions.filter(t=>t.opening).length;
+    el.textContent = ob ? ('مسجّل بتاريخ ' + ob.date + ' · ' + n + ' دين') : 'ديون سابقة + أرصدة المحافظ';
+  };
+})();
+syncUndoUI();
 </script>
 </body>
 </html>
